@@ -95,6 +95,9 @@
                             </goals>
                             <configuration>
                                 <arguments>run build</arguments>
+                                <environmentVariables>
+                                    <npm_config_app_name>${appName}</npm_config_app_name>
+                                </environmentVariables>
                             </configuration>
                         </execution>
                     </executions>

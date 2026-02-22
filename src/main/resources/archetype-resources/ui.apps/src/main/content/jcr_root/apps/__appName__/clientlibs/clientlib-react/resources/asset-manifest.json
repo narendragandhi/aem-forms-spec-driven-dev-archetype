@@ -1,0 +1,31 @@
+{
+  "files": {
+    "main.css": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/css/main.f504b7b4.chunk.css",
+    "main.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/main.9a7ba8a4.chunk.js",
+    "main.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/main.9a7ba8a4.chunk.js.map",
+    "runtime-main.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/runtime-main.676eaa17.js",
+    "runtime-main.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/runtime-main.676eaa17.js.map",
+    "static/js/2.40dd2d98.chunk.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/2.40dd2d98.chunk.js",
+    "static/js/2.40dd2d98.chunk.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/2.40dd2d98.chunk.js.map",
+    "static/js/3.d0c8f804.chunk.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/3.d0c8f804.chunk.js",
+    "static/js/3.d0c8f804.chunk.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/3.d0c8f804.chunk.js.map",
+    "static/css/4.269a8ef5.chunk.css": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/css/4.269a8ef5.chunk.css",
+    "static/js/4.15d7bb11.chunk.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/4.15d7bb11.chunk.js",
+    "static/js/4.15d7bb11.chunk.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/4.15d7bb11.chunk.js.map",
+    "static/js/5.3f99b168.chunk.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/5.3f99b168.chunk.js",
+    "static/js/5.3f99b168.chunk.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/5.3f99b168.chunk.js.map",
+    "static/js/6.baa2ce70.chunk.js": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/6.baa2ce70.chunk.js",
+    "static/js/6.baa2ce70.chunk.js.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/6.baa2ce70.chunk.js.map",
+    "index.html": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/index.html",
+    "static/css/4.269a8ef5.chunk.css.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/css/4.269a8ef5.chunk.css.map",
+    "static/css/main.f504b7b4.chunk.css.map": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/css/main.f504b7b4.chunk.css.map",
+    "static/js/2.40dd2d98.chunk.js.LICENSE.txt": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/2.40dd2d98.chunk.js.LICENSE.txt",
+    "static/js/3.d0c8f804.chunk.js.LICENSE.txt": "/etc.clientlibs/aem-forms-bmad-showcase/clientlibs/clientlib-react/resources/static/js/3.d0c8f804.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.676eaa17.js",
+    "static/js/2.40dd2d98.chunk.js",
+    "static/css/main.f504b7b4.chunk.css",
+    "static/js/main.9a7ba8a4.chunk.js"
+  ]
+}

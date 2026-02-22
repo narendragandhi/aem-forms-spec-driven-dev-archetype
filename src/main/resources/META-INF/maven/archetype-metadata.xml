@@ -31,12 +31,7 @@
             </includes>
         </fileSet>
 
-        <fileSet filtered="true" encoding="UTF-8">
-            <directory></directory>
-            <includes>
-                <include>**/pom.xml</include>
-            </includes>
-        </fileSet>
+
         <!-- Catch-all for everything else, no filtering -->
         <fileSet filtered="false" encoding="UTF-8">
             <directory></directory>
@@ -47,6 +42,9 @@
 
                 <!-- Exclude html files under ui.apps from the unfiltered set -->
                 <exclude>ui.apps/src/main/content/**/*.html</exclude>
+                <!-- Exclude node_modules and build directories -->
+                <exclude>**/node_modules/**</exclude>
+                <exclude>**/build/**</exclude>
             </excludes>
         </fileSet>
     </fileSets>

@@ -54,16 +54,13 @@
                     <group>${groupId}</group>
                     <name>${artifactId}.ui.apps</name>
                     <packageType>application</packageType>
+                    <acHandling>overwrite</acHandling>
                     <skipSubPackageValidation>true</skipSubPackageValidation>
-                    <skipValidation>true</skipValidation>
-                    <repositoryStructurePackages>
-                        <repositoryStructurePackage>
-                            <groupId>${groupId}</groupId>
-                            <artifactId>${artifactId}.ui.apps.structure</artifactId>
-                        </repositoryStructurePackage>
-                    </repositoryStructurePackages>
                     <dependencies>
                     </dependencies>
+                    <types>
+                        <type fileExtensions="css,js,txt,html,json,ico,png,eot,otf,ttf,woff,woff2">nt:file</type>
+                    </types>
                 </configuration>
             </plugin>
             <plugin>
@@ -131,12 +128,6 @@
         <dependency>
             <groupId>com.adobe.aem</groupId>
             <artifactId>spa.project.core.core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>${groupId}</groupId>
-            <artifactId>${artifactId}.ui.apps.structure</artifactId>
-            <version>${project.version}</version>
-            <type>zip</type>
         </dependency>
 
         <dependency>

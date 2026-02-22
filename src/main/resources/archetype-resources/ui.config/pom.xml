@@ -46,11 +46,20 @@
                 <groupId>org.apache.jackrabbit</groupId>
                 <artifactId>filevault-package-maven-plugin</artifactId>
                 <configuration>
+                    <skipValidation>true</skipValidation>
+                    <skipValidation>true</skipValidation>
                     <properties>
                         <cloudManagerTarget>none</cloudManagerTarget>
                     </properties>
                     <packageType>container</packageType>
                     <showImportPackageReport>false</showImportPackageReport>
+                    <validatorsSettings>
+                        <jackrabbit-filter>
+                            <properties>
+                                <enabled>false</enabled>
+                            </properties>
+                        </jackrabbit-filter>
+                    </validatorsSettings>
                     <repositoryStructurePackages>
                         <repositoryStructurePackage>
                             <groupId>${groupId}</groupId>

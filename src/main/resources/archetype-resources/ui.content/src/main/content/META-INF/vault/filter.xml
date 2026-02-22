@@ -1,19 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <workspaceFilter version="1.0">
-    <filter root="/etc/clientlibs/aem-forms-bmad-showcase/themes/global-brand-theme"/>
-    <filter root="/conf/aem-forms-bmad-showcase" mode="merge"/>
-    <filter root="/conf/aem-forms-bmad-showcase/settings/fdm/user-profile-fdm"/>
-    <filter root="/content/aem-forms-bmad-showcase" mode="merge"/>
-    <filter root="/content/forms/af/aem-forms-bmad-showcase/user-profile-form"/>
-    <filter root="/content/dam/aem-forms-bmad-showcase" mode="merge">
-        <exclude pattern="/content/dam/aem-forms-bmad-showcase(/.*)?"/>
-        <include pattern="/content/dam/aem-forms-bmad-showcase/jcr:content(/.*)?"/>
-    </filter>
-    <filter root="/content/dam/aem-forms-bmad-showcase/asset.jpg" mode="merge"/>
-    <filter root="/content/experience-fragments/aem-forms-bmad-showcase" mode="merge"/>
-    <filter root="/content/dam/formsanddocuments-themes/aem-forms-bmad-showcase" mode="merge"/>
-    <filter root="/content/dam/formsanddocuments-fdm/aem-forms-bmad-showcase" mode="merge"/>
-    <filter root="/content/dam/aem-forms-bmad-showcase/sample_logo.png" mode="merge"/>
-    <filter root="/content/dam/aem-forms-bmad-showcase/sample_terms.png" mode="merge"/>
-    <filter root="/content/dam/aem-forms-bmad-showcase/wknd_logo.png" mode="merge"/>
+    <filter root="/content" mode="merge"/>
+    <filter root="/conf" mode="merge"/>
+    <filter root="/etc/clientlibs" mode="merge"/>
 </workspaceFilter>

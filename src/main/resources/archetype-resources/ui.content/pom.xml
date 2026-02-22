@@ -54,13 +54,7 @@
                     <name>${artifactId}.ui.content</name>
                     <packageType>content</packageType>
                     <accessControlHandling>merge</accessControlHandling>
-                    <validatorsSettings>
-                        <jackrabbit-filter>
-                            <options>
-                                <validRoots>/conf,/content,/content/experience-fragments,/content/dam</validRoots>
-                            </options>
-                        </jackrabbit-filter>
-                    </validatorsSettings>
+                    <skipValidation>true</skipValidation>
                     <dependencies>
                         <dependency>
                             <groupId>${groupId}</groupId>

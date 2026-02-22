@@ -17,6 +17,8 @@
 const path = require('path');
 const getEntrypoints = require('./utils/entrypoints');
 
+const appName = process.env.npm_config_app_name || 'aem-forms-bmad-showcase';
+
 const BUILD_DIR = path.join(__dirname, 'build');
 const CLIENTLIB_DIR = path.join(
   __dirname,
@@ -27,7 +29,7 @@ const CLIENTLIB_DIR = path.join(
   'content',
   'jcr_root',
   'apps',
-  'aem-forms-bmad-showcase',
+  appName,
   'clientlibs'
 );
 const ASSET_MANIFEST_PATH = path.join(BUILD_DIR, 'asset-manifest.json');

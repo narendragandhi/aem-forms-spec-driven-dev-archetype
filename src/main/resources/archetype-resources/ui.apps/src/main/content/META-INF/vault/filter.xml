@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <workspaceFilter version="1.0">
-    <filter root="/apps/${appName}" mode="replace"/>
-    <filter root="/apps/fd/af/themes" mode="merge"/>
+    <filter root="/apps" mode="merge"/>
 </workspaceFilter>
