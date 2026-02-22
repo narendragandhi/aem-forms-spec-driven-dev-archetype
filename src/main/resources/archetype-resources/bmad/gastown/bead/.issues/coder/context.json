@@ -1,0 +1,60 @@
+{
+  "agent": "coder",
+  "last_updated": "2026-02-18T14:30:00Z",
+  "session_count": 1,
+  "current_workflow": {
+    "workflow_id": "DEMO-001",
+    "workflow_name": "Accordion Component Development",
+    "started_at": "2026-02-18T10:00:00Z",
+    "phase": "implementation"
+  },
+  "active_issues": [
+    {
+      "issue_id": "DEMO-001-impl-001",
+      "status": "in_progress",
+      "started_at": "2026-02-18T10:30:00Z",
+      "last_action": "Working on Touch UI dialog"
+    }
+  ],
+  "completed_issues": [],
+  "dependencies": {
+    "waiting_on": [],
+    "blocking": [
+      {
+        "issue_id": "DEMO-001-test-001",
+        "waiting_agent": "tester"
+      },
+      {
+        "issue_id": "DEMO-001-review-001",
+        "waiting_agent": "reviewer"
+      }
+    ]
+  },
+  "handoffs": {
+    "inbox": [],
+    "outbox": []
+  },
+  "metrics": {
+    "issues_completed": 0,
+    "avg_completion_time_hours": 0,
+    "issues_blocked": 0,
+    "handoffs_sent": 0,
+    "handoffs_received": 0
+  },
+  "preferences": {
+    "coding_standards": "bmad/04-Development-Sprint/development-guidelines.md",
+    "component_patterns": "bmad/03-Architecture-Design/component-design.md"
+  },
+  "notes": [
+    {
+      "timestamp": "2026-02-18T11:45:00Z",
+      "category": "implementation",
+      "content": "AccordionModel uses child resources pattern for items. Each item is a separate JCR node under the component."
+    },
+    {
+      "timestamp": "2026-02-18T13:00:00Z",
+      "category": "accessibility",
+      "content": "Implemented full ARIA support: role=region, aria-expanded, aria-controls, aria-labelledby"
+    }
+  ]
+}

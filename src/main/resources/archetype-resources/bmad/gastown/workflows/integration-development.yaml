@@ -1,0 +1,210 @@
+# Integration Development Workflow
+# Orchestrates development of external service integrations
+
+name: Integration Development
+version: "1.0"
+description: Workflow for developing integrations with external services (Analytics, Target, CRM, etc.)
+
+metadata:
+  author: BMAD Methodology
+  category: integration
+
+trigger:
+  type: manual
+  inputs:
+    - name: integration_name
+      type: string
+      required: true
+      description: Name of the integration (e.g., "adobe-analytics", "salesforce")
+    - name: integration_type
+      type: enum
+      values: [analytics, personalization, crm, commerce, translation, ai]
+      required: true
+    - name: requires_dispatcher
+      type: boolean
+      default: true
+
+agents:
+  - id: mayor
+    type: mayor
+    persona: gastown/agents/mayor.md
+  - id: coder
+    type: aem-component-coder
+    persona: gastown/agents/aem-component-coder.md
+  - id: tester
+    type: aem-test-writer
+    persona: gastown/agents/aem-test-writer.md
+  - id: reviewer
+    type: aem-code-reviewer
+    persona: gastown/agents/aem-code-reviewer.md
+  - id: dispatcher
+    type: aem-dispatcher-config
+    persona: gastown/agents/aem-dispatcher-config.md
+  - id: docs
+    type: aem-documentation
+    persona: gastown/agents/aem-documentation.md
+
+inputs:
+  - path: bmad/06-Integrations/${integration_name}-integration.md
+    required: false
+    description: Integration specification if exists
+  - path: bmad/06-Integrations/integration-best-practices.md
+    required: true
+  - path: bmad/03-Architecture-Design/system-architecture.md
+    required: true
+
+phases:
+  # Phase 1: Planning
+  - id: planning
+    name: Integration Planning
+    agent: mayor
+    actions:
+      - action: analyze_integration_requirements
+      - action: identify_aemaacs_considerations
+        description: Stateless, CDN, secrets, etc.
+      - action: create_bead_issues
+      - action: assign_agents
+    outputs:
+      - integration_plan
+      - bead_issues
+
+  # Phase 2: Service Implementation
+  - id: service_implementation
+    name: Service Layer Development
+    agent: coder
+    depends_on: [planning]
+    actions:
+      - action: create_service_interface
+        outputs:
+          - path: core/src/main/java/**/services/${IntegrationName}Service.java
+      - action: create_service_implementation
+        outputs:
+          - path: core/src/main/java/**/services/impl/${IntegrationName}ServiceImpl.java
+      - action: create_osgi_config
+        outputs:
+          - path: core/src/main/java/**/config/${IntegrationName}Config.java
+      - action: create_models
+        outputs:
+          - path: core/src/main/java/**/models/${IntegrationName}*.java
+    success_criteria:
+      - Service compiles
+      - Config annotation correct
+      - Cloud Manager secrets referenced
+
+  # Phase 3: Client-Side Integration (if applicable)
+  - id: client_implementation
+    name: Client-Side Integration
+    agent: coder
+    depends_on: [service_implementation]
+    condition: "${integration_type} in ['analytics', 'personalization']"
+    actions:
+      - action: create_data_layer_model
+      - action: create_tracking_scripts
+      - action: create_htl_includes
+    outputs:
+      - path: ui.frontend/src/integrations/${integration_name}/
+
+  # Phase 4: Dispatcher Configuration
+  - id: dispatcher_config
+    name: Dispatcher Configuration
+    agent: dispatcher
+    depends_on: [service_implementation]
+    condition: "${requires_dispatcher} == true"
+    actions:
+      - action: create_filter_rules
+      - action: create_cache_rules
+      - action: create_rewrite_rules
+    outputs:
+      - path: dispatcher/src/conf.dispatcher.d/filters/${integration_name}_filters.any
+      - path: dispatcher/src/conf.dispatcher.d/cache/${integration_name}_cache.any
+
+  # Phase 5: Testing
+  - id: testing
+    name: Integration Testing
+    agent: tester
+    depends_on: [service_implementation, client_implementation, dispatcher_config]
+    actions:
+      - action: create_unit_tests
+      - action: create_mock_service
+        description: Mock for local/RDE testing
+      - action: create_integration_tests
+    outputs:
+      - path: core/src/test/java/**/services/${IntegrationName}*Test.java
+    success_criteria:
+      - Unit tests pass
+      - Mock service works
+      - Coverage >= 80%
+
+  # Phase 6: Code Review
+  - id: review
+    name: Security & Integration Review
+    agent: reviewer
+    depends_on: [testing]
+    actions:
+      - action: review_security
+        focus: [secrets, credentials, injection]
+      - action: review_error_handling
+      - action: review_aemaacs_compliance
+      - action: review_performance
+    success_criteria:
+      - No secrets in code
+      - Proper error handling
+      - Stateless design
+      - Timeout handling
+
+  # Phase 7: Documentation
+  - id: documentation
+    name: Integration Documentation
+    agent: docs
+    depends_on: [review]
+    condition: "${review.approved} == true"
+    actions:
+      - action: create_integration_docs
+      - action: create_configuration_guide
+      - action: create_troubleshooting_guide
+    outputs:
+      - path: bmad/06-Integrations/${integration_name}-integration.md
+
+  # Phase 8: OSGi Config Files
+  - id: config_files
+    name: Environment Configurations
+    agent: coder
+    depends_on: [documentation]
+    actions:
+      - action: create_dev_config
+        outputs:
+          - path: ui.config/src/main/content/**/config.dev/*.cfg.json
+      - action: create_stage_config
+        outputs:
+          - path: ui.config/src/main/content/**/config.stage/*.cfg.json
+      - action: create_prod_config
+        outputs:
+          - path: ui.config/src/main/content/**/config.prod/*.cfg.json
+      - action: create_local_mock_config
+        outputs:
+          - path: ui.config/src/main/content/**/config.local/*.cfg.json
+
+  # Phase 9: Completion
+  - id: completion
+    name: Workflow Completion
+    agent: mayor
+    depends_on: [config_files]
+    actions:
+      - action: verify_all_outputs
+      - action: test_local_deployment
+      - action: close_bead_issues
+      - action: generate_summary
+
+quality_gates:
+  - name: no_hardcoded_secrets
+    phase: review
+    check: grep -r "password\|secret\|apikey" --exclude="*.md" | wc -l == 0
+    required: true
+  - name: cloud_manager_variables
+    phase: config_files
+    check: configs_use_env_variables
+    required: true
+
+timeouts:
+  phase_default: 45m
+  workflow_max: 6h

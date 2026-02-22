@@ -1,0 +1,282 @@
+# Component Development Workflow
+# Orchestrates the development of new AEM components
+
+name: Component Development
+version: "1.0"
+description: End-to-end workflow for developing new AEM components
+
+# Workflow metadata
+metadata:
+  author: BMAD Methodology
+  created: 2024-01-01
+  updated: 2024-01-15
+  category: development
+
+# Trigger conditions
+trigger:
+  type: manual
+  inputs:
+    - name: component_name
+      type: string
+      required: true
+      description: Name of the component to develop (e.g., "accordion")
+    - name: component_type
+      type: enum
+      values: [content, structure, container]
+      default: content
+      description: Type of component
+    - name: priority
+      type: enum
+      values: [high, medium, low]
+      default: medium
+
+# Agents involved in this workflow
+agents:
+  - id: mayor
+    type: mayor
+    persona: gastown/agents/mayor.md
+  - id: coder
+    type: aem-component-coder
+    persona: gastown/agents/aem-component-coder.md
+  - id: tester
+    type: aem-test-writer
+    persona: gastown/agents/aem-test-writer.md
+  - id: reviewer
+    type: aem-code-reviewer
+    persona: gastown/agents/aem-code-reviewer.md
+  - id: docs
+    type: aem-documentation
+    persona: gastown/agents/aem-documentation.md
+
+# Input documents from BMAD
+inputs:
+  - path: bmad/03-Architecture-Design/component-design.md
+    required: true
+    description: Component design specifications
+  - path: bmad/02-Model-Definition/design-system.md
+    required: true
+    description: Design system tokens and patterns
+  - path: bmad/04-Development-Sprint/development-guidelines.md
+    required: true
+    description: Coding standards and conventions
+
+# Workflow phases
+phases:
+  # Phase 1: Planning
+  - id: planning
+    name: Planning & Decomposition
+    agent: mayor
+    description: Mayor decomposes task and assigns to agents
+    actions:
+      - action: analyze_requirements
+        inputs:
+          - "${inputs.component_design}"
+        outputs:
+          - component_spec
+      - action: create_bead_issues
+        outputs:
+          - bead_issues
+      - action: assign_agents
+        outputs:
+          - agent_assignments
+    outputs:
+      - path: bead/.issues/coder/${component_name}-impl.md
+      - path: bead/.issues/tester/${component_name}-test.md
+      - path: bead/.issues/reviewer/${component_name}-review.md
+    success_criteria:
+      - All BEAD issues created
+      - All agents assigned
+
+  # Phase 2: Implementation
+  - id: implementation
+    name: Component Implementation
+    agent: coder
+    depends_on: [planning]
+    description: Coder implements the component
+    actions:
+      - action: create_sling_model
+        outputs:
+          - path: core/src/main/java/**/models/${ComponentName}Model.java
+      - action: create_htl_template
+        outputs:
+          - path: ui.apps/**/components/content/${component_name}/${component_name}.html
+      - action: create_dialog
+        outputs:
+          - path: ui.apps/**/components/content/${component_name}/_cq_dialog/.content.xml
+      - action: create_clientlib
+        outputs:
+          - path: ui.frontend/src/components/${component_name}/
+    outputs:
+      - path: core/src/main/java/**/models/${ComponentName}Model.java
+      - path: ui.apps/**/components/content/${component_name}/
+      - path: ui.frontend/src/components/${component_name}/
+    success_criteria:
+      - Code compiles without errors
+      - All required files created
+      - Follows coding standards
+
+  # Phase 3: Testing
+  - id: testing
+    name: Test Development
+    agent: tester
+    depends_on: [implementation]
+    description: Tester creates unit and integration tests
+    actions:
+      - action: create_unit_tests
+        inputs:
+          - "${outputs.implementation}"
+        outputs:
+          - path: core/src/test/java/**/models/${ComponentName}ModelTest.java
+      - action: create_test_content
+        outputs:
+          - path: core/src/test/resources/${component_name}/test-content.json
+      - action: run_tests
+        outputs:
+          - test_results
+    outputs:
+      - path: core/src/test/java/**/models/${ComponentName}ModelTest.java
+      - path: core/src/test/resources/${component_name}/
+    success_criteria:
+      - All tests pass
+      - Coverage >= 80%
+      - Edge cases covered
+
+  # Phase 4: Code Review
+  - id: review
+    name: Code Review
+    agent: reviewer
+    depends_on: [implementation, testing]
+    description: Reviewer validates code quality
+    actions:
+      - action: review_code
+        inputs:
+          - "${outputs.implementation}"
+          - "${outputs.testing}"
+        outputs:
+          - review_report
+      - action: check_security
+        outputs:
+          - security_findings
+      - action: check_accessibility
+        outputs:
+          - accessibility_findings
+    outputs:
+      - path: bead/.issues/reviews/${component_name}-review.md
+    success_criteria:
+      - No critical issues
+      - Security approved
+      - Accessibility approved
+    on_failure:
+      - action: route_to_coder
+        condition: issues_found
+        next_phase: implementation_fixes
+
+  # Phase 4b: Implementation Fixes (conditional)
+  - id: implementation_fixes
+    name: Fix Review Issues
+    agent: coder
+    depends_on: [review]
+    condition: "${review.issues_found} == true"
+    description: Coder fixes issues from review
+    actions:
+      - action: fix_issues
+        inputs:
+          - "${outputs.review}"
+      - action: update_bead_issue
+    success_criteria:
+      - All issues resolved
+    next_phase: review_verification
+
+  # Phase 4c: Review Verification (conditional)
+  - id: review_verification
+    name: Verify Fixes
+    agent: reviewer
+    depends_on: [implementation_fixes]
+    condition: "${implementation_fixes.completed} == true"
+    actions:
+      - action: verify_fixes
+    success_criteria:
+      - All issues resolved
+      - Approved for merge
+
+  # Phase 5: Documentation
+  - id: documentation
+    name: Documentation
+    agent: docs
+    depends_on: [review]
+    condition: "${review.approved} == true"
+    description: Document the component
+    actions:
+      - action: create_component_docs
+        outputs:
+          - path: docs/components/${component_name}.md
+      - action: update_readme
+      - action: update_changelog
+    outputs:
+      - path: docs/components/${component_name}.md
+    success_criteria:
+      - Documentation complete
+      - Examples provided
+
+  # Phase 6: Completion
+  - id: completion
+    name: Workflow Completion
+    agent: mayor
+    depends_on: [documentation]
+    description: Mayor aggregates results and closes workflow
+    actions:
+      - action: verify_all_outputs
+      - action: close_bead_issues
+      - action: generate_summary
+        outputs:
+          - workflow_summary
+      - action: report_to_bmad
+    outputs:
+      - path: bead/.issues/workflows/${workflow_id}-summary.md
+    success_criteria:
+      - All phases completed
+      - All BEAD issues closed
+      - Summary generated
+
+# Quality gates
+quality_gates:
+  - name: compilation
+    phase: implementation
+    check: mvn compile
+    required: true
+  - name: tests
+    phase: testing
+    check: mvn test
+    required: true
+  - name: coverage
+    phase: testing
+    check: coverage >= 80%
+    required: true
+  - name: security
+    phase: review
+    check: no_critical_security_issues
+    required: true
+
+# Notifications
+notifications:
+  on_phase_complete:
+    - log: "Phase ${phase.name} completed by ${phase.agent}"
+  on_failure:
+    - log: "Phase ${phase.name} failed: ${error}"
+    - escalate: bmad_pm_agent
+  on_workflow_complete:
+    - log: "Workflow completed successfully"
+    - notify: bmad_layer
+
+# Timeout settings
+timeouts:
+  phase_default: 30m
+  workflow_max: 4h
+
+# Retry policy
+retry:
+  max_attempts: 2
+  backoff: exponential
+  conditions:
+    - transient_error
+    - timeout

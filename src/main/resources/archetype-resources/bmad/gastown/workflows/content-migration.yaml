@@ -1,0 +1,355 @@
+# Content Migration Workflow
+# Orchestrates content migration from legacy systems to AEM
+
+name: Content Migration
+version: "1.0"
+description: Workflow for migrating content from legacy CMS to AEM as a Cloud Service
+
+metadata:
+  author: BMAD Methodology
+  category: migration
+
+trigger:
+  type: manual
+  inputs:
+    - name: source_system
+      type: enum
+      values: [wordpress, drupal, sitecore, aem6, custom]
+      required: true
+    - name: content_type
+      type: enum
+      values: [pages, assets, fragments, all]
+      required: true
+    - name: source_path
+      type: string
+      required: true
+      description: Source content path or export location
+    - name: target_path
+      type: string
+      required: true
+      description: Target AEM content path
+    - name: batch_size
+      type: integer
+      default: 100
+      description: Number of items per migration batch
+
+agents:
+  - id: mayor
+    type: mayor
+    persona: gastown/agents/mayor.md
+  - id: coder
+    type: aem-component-coder
+    persona: gastown/agents/aem-component-coder.md
+  - id: tester
+    type: aem-test-writer
+    persona: gastown/agents/aem-test-writer.md
+  - id: reviewer
+    type: aem-code-reviewer
+    persona: gastown/agents/aem-code-reviewer.md
+  - id: docs
+    type: aem-documentation
+    persona: gastown/agents/aem-documentation.md
+
+inputs:
+  - path: bmad/05-Migration/content-migration-plan.md
+    required: true
+  - path: bmad/05-Migration/content-mapping.md
+    required: true
+  - path: bmad/03-Architecture-Design/content-model.md
+    required: true
+  - path: bmad/02-Model-Definition/design-system.md
+    required: true
+
+phases:
+  # Phase 1: Analysis
+  - id: analysis
+    name: Source Content Analysis
+    agent: mayor
+    description: Analyze source content structure and plan migration
+    actions:
+      - action: analyze_source_content
+        inputs:
+          - source_system
+          - source_path
+        outputs:
+          - content_inventory
+          - content_types
+          - media_inventory
+      - action: identify_mapping_requirements
+        outputs:
+          - field_mappings
+          - component_mappings
+      - action: estimate_migration_scope
+        outputs:
+          - migration_estimate
+      - action: create_bead_issues
+      - action: assign_agents
+    outputs:
+      - content_inventory
+      - migration_plan
+      - bead_issues
+    success_criteria:
+      - Content inventory complete
+      - Mappings identified
+      - Migration plan approved
+
+  # Phase 2: Mapping Development
+  - id: mapping_development
+    name: Content Mapping Development
+    agent: coder
+    depends_on: [analysis]
+    description: Develop content transformation mappings
+    actions:
+      - action: create_content_mapper_service
+        outputs:
+          - path: core/src/main/java/**/migration/ContentMapperService.java
+      - action: create_field_transformers
+        outputs:
+          - path: core/src/main/java/**/migration/transformers/*.java
+      - action: create_component_mappers
+        description: Map source components to AEM components
+        outputs:
+          - path: core/src/main/java/**/migration/mappers/*.java
+      - action: create_asset_processor
+        outputs:
+          - path: core/src/main/java/**/migration/AssetMigrationService.java
+    outputs:
+      - path: core/src/main/java/**/migration/
+    success_criteria:
+      - All mappers compile
+      - Field transformations defined
+      - Component mappings complete
+
+  # Phase 3: Migration Scripts
+  - id: migration_scripts
+    name: Migration Script Development
+    agent: coder
+    depends_on: [mapping_development]
+    description: Create migration execution scripts
+    actions:
+      - action: create_migration_servlet
+        description: HTTP endpoint for triggering migrations
+        outputs:
+          - path: core/src/main/java/**/migration/MigrationServlet.java
+      - action: create_batch_processor
+        outputs:
+          - path: core/src/main/java/**/migration/BatchMigrationJob.java
+      - action: create_validation_service
+        outputs:
+          - path: core/src/main/java/**/migration/MigrationValidationService.java
+      - action: create_rollback_service
+        outputs:
+          - path: core/src/main/java/**/migration/MigrationRollbackService.java
+    outputs:
+      - path: core/src/main/java/**/migration/
+    success_criteria:
+      - Migration scripts complete
+      - Batch processing works
+      - Rollback capability exists
+
+  # Phase 4: Testing
+  - id: testing
+    name: Migration Testing
+    agent: tester
+    depends_on: [migration_scripts]
+    description: Test migration with sample content
+    actions:
+      - action: create_unit_tests
+        outputs:
+          - path: core/src/test/java/**/migration/*Test.java
+      - action: create_sample_content
+        description: Sample source content for testing
+        outputs:
+          - path: core/src/test/resources/migration/sample-content/
+      - action: create_migration_tests
+        outputs:
+          - path: core/src/test/java/**/migration/MigrationIntegrationTest.java
+      - action: run_sample_migration
+        description: Migrate sample content to verify
+    outputs:
+      - test_results
+      - sample_migration_report
+    success_criteria:
+      - Unit tests pass
+      - Sample migration succeeds
+      - Content integrity verified
+
+  # Phase 5: Code Review
+  - id: review
+    name: Migration Code Review
+    agent: reviewer
+    depends_on: [testing]
+    description: Review migration code for quality and safety
+    actions:
+      - action: review_data_integrity
+        focus: [content_preservation, media_handling, metadata]
+      - action: review_error_handling
+        focus: [partial_failure, retry_logic, logging]
+      - action: review_performance
+        focus: [batch_size, memory_usage, timeouts]
+      - action: review_rollback_capability
+    outputs:
+      - review_report
+    success_criteria:
+      - Data integrity verified
+      - Error handling adequate
+      - Rollback tested
+
+  # Phase 6: Pilot Migration
+  - id: pilot
+    name: Pilot Migration
+    agent: coder
+    depends_on: [review]
+    condition: "${review.approved} == true"
+    description: Migrate subset of production content
+    actions:
+      - action: select_pilot_content
+        description: Select representative subset
+      - action: execute_pilot_migration
+      - action: validate_pilot_results
+        outputs:
+          - pilot_validation_report
+      - action: collect_metrics
+        outputs:
+          - migration_metrics
+    outputs:
+      - pilot_validation_report
+      - migration_metrics
+    success_criteria:
+      - Pilot content migrated
+      - Content integrity verified
+      - Performance acceptable
+
+  # Phase 7: Full Migration
+  - id: full_migration
+    name: Full Content Migration
+    agent: coder
+    depends_on: [pilot]
+    condition: "${pilot.success} == true"
+    description: Execute full content migration
+    actions:
+      - action: prepare_migration_batches
+      - action: execute_batch_migration
+        loop: true
+        batch_size: "${inputs.batch_size}"
+      - action: validate_each_batch
+      - action: generate_migration_report
+    outputs:
+      - migration_report
+    success_criteria:
+      - All content migrated
+      - Validation passed
+      - No critical errors
+
+  # Phase 8: Validation
+  - id: validation
+    name: Post-Migration Validation
+    agent: tester
+    depends_on: [full_migration]
+    description: Comprehensive validation of migrated content
+    actions:
+      - action: validate_content_count
+      - action: validate_content_structure
+      - action: validate_media_references
+      - action: validate_internal_links
+      - action: run_visual_regression
+        condition: "${inputs.content_type} in ['pages', 'all']"
+      - action: generate_validation_report
+    outputs:
+      - validation_report
+    success_criteria:
+      - Content counts match
+      - Structure valid
+      - Links working
+      - Media accessible
+
+  # Phase 9: Documentation
+  - id: documentation
+    name: Migration Documentation
+    agent: docs
+    depends_on: [validation]
+    description: Document migration process and results
+    actions:
+      - action: create_migration_runbook
+        outputs:
+          - path: docs/runbooks/content-migration-runbook.md
+      - action: create_rollback_procedure
+        outputs:
+          - path: docs/runbooks/migration-rollback.md
+      - action: document_field_mappings
+        outputs:
+          - path: bmad/05-Migration/field-mapping-reference.md
+      - action: create_migration_summary
+        outputs:
+          - path: bmad/05-Migration/migration-summary.md
+    outputs:
+      - documentation_files
+    success_criteria:
+      - Runbook complete
+      - Mappings documented
+      - Summary generated
+
+  # Phase 10: Completion
+  - id: completion
+    name: Migration Completion
+    agent: mayor
+    depends_on: [documentation]
+    actions:
+      - action: verify_all_content_migrated
+      - action: close_bead_issues
+      - action: generate_final_report
+      - action: archive_migration_logs
+    outputs:
+      - path: bead/.issues/completed/migration-${workflow_id}-summary.md
+    success_criteria:
+      - All content verified
+      - Documentation complete
+      - BEAD issues closed
+
+quality_gates:
+  - name: source_accessible
+    phase: analysis
+    check: source_content_accessible
+    required: true
+  - name: mappings_complete
+    phase: mapping_development
+    check: all_content_types_mapped
+    required: true
+  - name: pilot_success
+    phase: pilot
+    check: pilot_validation_passed
+    required: true
+  - name: content_integrity
+    phase: validation
+    check: content_count_matches
+    required: true
+
+notifications:
+  on_phase_complete:
+    - log: "Phase ${phase.name} completed - ${metrics.items_processed} items"
+  on_batch_complete:
+    - log: "Batch ${batch.number}/${batch.total} complete"
+  on_failure:
+    - log: "Migration failed at phase ${phase.name}: ${error}"
+    - escalate: bmad_pm_agent
+  on_workflow_complete:
+    - log: "Migration completed: ${metrics.total_items} items migrated"
+    - notify: stakeholders
+
+timeouts:
+  phase_default: 2h
+  full_migration: 24h
+  workflow_max: 48h
+
+retry:
+  max_attempts: 3
+  backoff: exponential
+  conditions:
+    - transient_error
+    - timeout
+    - network_error
+
+rollback:
+  enabled: true
+  checkpoint_frequency: batch
+  max_rollback_window: 7d

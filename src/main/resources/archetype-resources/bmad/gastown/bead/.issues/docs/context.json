@@ -1,0 +1,28 @@
+{
+  "agent": "docs",
+  "last_updated": "2026-02-18T00:00:00Z",
+  "session_count": 0,
+  "current_workflow": null,
+  "active_issues": [],
+  "completed_issues": [],
+  "dependencies": {
+    "waiting_on": [],
+    "blocking": []
+  },
+  "handoffs": {
+    "inbox": [],
+    "outbox": []
+  },
+  "metrics": {
+    "issues_completed": 0,
+    "avg_completion_time_hours": 0,
+    "issues_blocked": 0,
+    "handoffs_sent": 0,
+    "handoffs_received": 0
+  },
+  "preferences": {
+    "documentation_style": "bmad/gastown/agents/aem-documentation.md",
+    "templates_dir": "bmad/gastown/bead/templates/"
+  },
+  "notes": []
+}

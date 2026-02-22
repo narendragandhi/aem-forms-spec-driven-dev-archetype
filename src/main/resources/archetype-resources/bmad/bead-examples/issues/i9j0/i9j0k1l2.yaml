@@ -1,0 +1,132 @@
+# BEAD Issue: Hero Sling Model Sub-task
+# Agent: AEM Component Coder
+# This is a sub-task of the Hero Component Epic (a1b2c3d4)
+
+id: i9j0k1l2
+type: sub-task
+title: "Create Hero Sling Model"
+status: completed
+priority: high
+created: "2024-02-07T10:30:00Z"
+updated: "2024-02-07T11:00:00Z"
+agent: aem-component-coder
+parent: a1b2c3d4
+
+# Detailed Task Context
+context:
+  objective: |
+    Create a Sling Model that exposes the Hero component's JCR properties
+    to the HTL template. Model must implement ComponentExporter for
+    headless/SPA compatibility.
+
+  input_specification:
+    source: "bmad/03-Architecture-Design/component-design.md"
+    section: "Hero Component - Sling Model"
+    content: |
+      - Sling Model: com.example.aem.bmad.core.models.HeroModel
+      - Injects JCR properties from dialog
+      - Exposes: heading, subheading, backgroundImage, ctaButtonText, ctaButtonLink
+      - All text fields i18n-ready
+      - Implements ComponentExporter for JSON export
+
+  constraints:
+    - Use @ValueMapValue annotation for injection
+    - All fields must be @Optional (graceful degradation)
+    - Follow Google Java Style Guide
+    - Class-level Javadoc required
+    - Resource type must match component path
+
+  design_decisions_made:
+    - annotation: "@ValueMapValue"
+      alternative: "@Inject"
+      reason: "More explicit, type-safe, preferred for JCR properties"
+
+    - annotation: "@Optional"
+      reason: "Component should render with partial content"
+
+    - interface: "ComponentExporter"
+      reason: "Required for Sling Model Exporter, enables headless consumption"
+
+# Implementation Steps
+implementation_steps:
+  - step: 1
+    description: "Create package structure"
+    status: completed
+    output: "com.example.aem.bmad.core.models"
+
+  - step: 2
+    description: "Create HeroModel class with @Model annotation"
+    status: completed
+    code: |
+      @Model(adaptables = SlingHttpServletRequest.class,
+             adapters = {HeroModel.class, ComponentExporter.class},
+             resourceType = HeroModel.RESOURCE_TYPE)
+
+  - step: 3
+    description: "Add @Exporter annotation for JSON support"
+    status: completed
+    code: |
+      @Exporter(name = ExporterConstants.SLING_MODEL_EXPORTER_NAME,
+                extensions = ExporterConstants.SLING_MODEL_EXTENSION)
+
+  - step: 4
+    description: "Define RESOURCE_TYPE constant"
+    status: completed
+    code: |
+      static final String RESOURCE_TYPE = "aem-bmad-showcase/components/content/hero";
+
+  - step: 5
+    description: "Add field injections with @ValueMapValue @Optional"
+    status: completed
+    fields:
+      - "heading: String"
+      - "subheading: String"
+      - "backgroundImage: String"
+      - "ctaButtonText: String"
+      - "ctaButtonLink: String"
+
+  - step: 6
+    description: "Add getter methods for all fields"
+    status: completed
+
+  - step: 7
+    description: "Implement getExportedType() method"
+    status: completed
+    code: |
+      @Override
+      public String getExportedType() {
+          return RESOURCE_TYPE;
+      }
+
+# Verification Checklist
+verification:
+  - check: "Class compiles without errors"
+    status: passed
+
+  - check: "Follows Google Java Style Guide"
+    status: passed
+
+  - check: "All fields have @Optional annotation"
+    status: passed
+
+  - check: "Implements ComponentExporter"
+    status: passed
+
+  - check: "RESOURCE_TYPE matches component path"
+    status: passed
+
+  - check: "Package-private static final for RESOURCE_TYPE"
+    status: passed
+    note: "Made package-private for test access"
+
+# Final Output
+output:
+  file: "core/src/main/java/com/example/aem/bmad/core/models/HeroModel.java"
+  lines_of_code: 62
+  complexity: "Low"
+
+# Completion Notes
+completion_notes: |
+  Sling Model created successfully. Ready for HTL template development.
+  Note: RESOURCE_TYPE is package-private (not private) to allow
+  HeroModelTest to reference it for test assertions.

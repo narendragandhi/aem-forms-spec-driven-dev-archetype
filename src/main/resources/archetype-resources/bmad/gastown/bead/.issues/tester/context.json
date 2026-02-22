@@ -1,0 +1,45 @@
+{
+  "agent": "tester",
+  "last_updated": "2026-02-18T10:00:00Z",
+  "session_count": 0,
+  "current_workflow": {
+    "workflow_id": "DEMO-001",
+    "workflow_name": "Accordion Component Development",
+    "started_at": "2026-02-18T10:00:00Z",
+    "phase": "waiting"
+  },
+  "active_issues": [],
+  "completed_issues": [],
+  "dependencies": {
+    "waiting_on": [
+      {
+        "issue_id": "DEMO-001-impl-001",
+        "blocking_agent": "coder",
+        "since": "2026-02-18T10:00:00Z"
+      }
+    ],
+    "blocking": [
+      {
+        "issue_id": "DEMO-001-review-001",
+        "waiting_agent": "reviewer"
+      }
+    ]
+  },
+  "handoffs": {
+    "inbox": [],
+    "outbox": []
+  },
+  "metrics": {
+    "issues_completed": 0,
+    "avg_completion_time_hours": 0,
+    "issues_blocked": 1,
+    "handoffs_sent": 0,
+    "handoffs_received": 0
+  },
+  "preferences": {
+    "test_framework": "AemContext + JUnit 5",
+    "coverage_target": 80,
+    "testing_guide": "bmad/05-Testing-and-Deployment/testing-strategy.md"
+  },
+  "notes": []
+}

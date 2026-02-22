@@ -1,0 +1,44 @@
+{
+  "agent": "reviewer",
+  "last_updated": "2026-02-18T10:00:00Z",
+  "session_count": 0,
+  "current_workflow": {
+    "workflow_id": "DEMO-001",
+    "workflow_name": "Accordion Component Development",
+    "started_at": "2026-02-18T10:00:00Z",
+    "phase": "waiting"
+  },
+  "active_issues": [],
+  "completed_issues": [],
+  "dependencies": {
+    "waiting_on": [
+      {
+        "issue_id": "DEMO-001-impl-001",
+        "blocking_agent": "coder",
+        "since": "2026-02-18T10:00:00Z"
+      },
+      {
+        "issue_id": "DEMO-001-test-001",
+        "blocking_agent": "tester",
+        "since": "2026-02-18T10:00:00Z"
+      }
+    ],
+    "blocking": []
+  },
+  "handoffs": {
+    "inbox": [],
+    "outbox": []
+  },
+  "metrics": {
+    "issues_completed": 0,
+    "avg_completion_time_hours": 0,
+    "issues_blocked": 2,
+    "handoffs_sent": 0,
+    "handoffs_received": 0
+  },
+  "preferences": {
+    "review_checklist": "bmad/gastown/agents/aem-code-reviewer.md",
+    "security_standards": "bmad/07-Operations/04-security-hardening-checklist.md"
+  },
+  "notes": []
+}

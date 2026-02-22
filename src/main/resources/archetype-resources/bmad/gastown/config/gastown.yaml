@@ -1,0 +1,214 @@
+# GasTown Configuration
+# Central configuration for the AI agent orchestration layer
+
+version: "1.0"
+name: "AEM BMAD Showcase - GasTown"
+
+# Project metadata
+project:
+  name: aem-bmad-showcase
+  description: "AEM as a Cloud Service reference implementation using BMAD methodology"
+  repository: https://github.com/narendragandhi/aem-bmad-showcase
+
+# Agent definitions
+agents:
+  mayor:
+    name: "Mayor AI"
+    description: "Central orchestrator for GasTown workflows"
+    persona: agents/mayor.md
+    capabilities:
+      - task_decomposition
+      - agent_assignment
+      - progress_monitoring
+      - dependency_management
+      - quality_assurance
+
+  coder:
+    name: "AEM Component Coder"
+    description: "Specialist in AEM component development"
+    persona: agents/aem-component-coder.md
+    capabilities:
+      - sling_models
+      - htl_templates
+      - component_dialogs
+      - client_libraries
+      - osgi_services
+    tools:
+      - maven
+      - git
+      - aem_cli
+
+  tester:
+    name: "AEM Test Writer"
+    description: "Specialist in AEM testing"
+    persona: agents/aem-test-writer.md
+    capabilities:
+      - unit_testing
+      - integration_testing
+      - accessibility_testing
+      - frontend_testing
+    tools:
+      - junit5
+      - aem_mocks
+      - wcm_io_testing
+      - playwright
+
+  reviewer:
+    name: "AEM Code Reviewer"
+    description: "Specialist in code quality and security review"
+    persona: agents/aem-code-reviewer.md
+    capabilities:
+      - code_quality_review
+      - security_review
+      - performance_review
+      - accessibility_review
+      - aemaacs_compatibility
+
+  dispatcher:
+    name: "AEM Dispatcher Config"
+    description: "Specialist in Dispatcher configuration"
+    persona: agents/aem-dispatcher-config.md
+    capabilities:
+      - cache_configuration
+      - rewrite_rules
+      - filter_rules
+      - security_headers
+
+  docs:
+    name: "AEM Documentation"
+    description: "Specialist in technical documentation"
+    persona: agents/aem-documentation.md
+    capabilities:
+      - component_documentation
+      - api_documentation
+      - authoring_guides
+      - architecture_diagrams
+
+# Workflow configurations
+workflows:
+  default: component-development
+
+  available:
+    - name: component-development
+      file: workflows/component-development.yaml
+      description: "End-to-end workflow for new AEM components"
+      agents: [coder, tester, reviewer, docs]
+
+    - name: integration-development
+      file: workflows/integration-development.yaml
+      description: "Workflow for external service integrations"
+      agents: [coder, dispatcher, tester, reviewer]
+
+    - name: bug-fix
+      file: workflows/bug-fix.yaml
+      description: "Streamlined workflow for bug fixes"
+      agents: [coder, tester, reviewer]
+
+    - name: content-migration
+      file: workflows/content-migration.yaml
+      description: "Workflow for content migration tasks"
+      agents: [coder, tester]
+
+# BEAD configuration
+bead:
+  issues_dir: bead/.issues
+  templates_dir: bead/templates
+
+  # Agent directories
+  agent_dirs:
+    - inbox
+    - coder
+    - tester
+    - reviewer
+    - dispatcher
+    - docs
+    - blocked
+    - completed
+
+  # Issue statuses
+  statuses:
+    - pending
+    - in_progress
+    - blocked
+    - completed
+    - cancelled
+
+  # Priority levels
+  priorities:
+    - critical
+    - high
+    - medium
+    - low
+
+# Quality gates
+quality_gates:
+  compilation:
+    command: mvn compile -q
+    required: true
+
+  unit_tests:
+    command: mvn test -q
+    required: true
+
+  coverage:
+    command: mvn jacoco:report
+    threshold: 80
+    required: true
+
+  security_scan:
+    command: mvn dependency-check:check
+    required: false
+
+# Timeouts (in minutes)
+timeouts:
+  phase_default: 30
+  workflow_max: 240
+  blocked_escalation: 60
+
+# Retry policy
+retry:
+  max_attempts: 2
+  backoff: exponential
+  conditions:
+    - transient_error
+    - timeout
+    - compilation_failure
+
+# Notifications
+notifications:
+  on_workflow_start: true
+  on_phase_complete: true
+  on_blocked: true
+  on_workflow_complete: true
+
+# Claude Code integration
+claude_code:
+  # How to invoke GasTown in Claude Code
+  invocation_examples:
+    mayor: |
+      Please read bmad/gastown/agents/mayor.md and adopt the Mayor AI persona.
+      Orchestrate workflow {workflow_id} following the component-development workflow.
+
+    agent: |
+      Please read bmad/gastown/agents/{agent}.md and adopt that persona.
+      Work on issue {issue_id} from bmad/gastown/bead/.issues/{agent}/.
+
+  # Session protocol
+  session_protocol:
+    start:
+      - Read your context.json file
+      - Check for pending handoffs in inbox
+      - Identify current active issues
+      - Resume or pick up new work
+    end:
+      - Update context.json with session progress
+      - Commit all changes with BEAD commit format
+      - Update issue status if needed
+
+# Paths (relative to gastown directory)
+paths:
+  agents: agents/
+  workflows: workflows/
+  bead: bead/
+  scripts: scripts/
+  config: config/

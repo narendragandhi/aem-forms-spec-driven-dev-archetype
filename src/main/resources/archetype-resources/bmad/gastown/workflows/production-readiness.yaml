@@ -1,0 +1,557 @@
+# Production Readiness Workflow
+#
+# This workflow automates the production hardening tasks that AI agents can complete.
+# Human-required tasks are flagged for manual completion.
+#
+# CUSTOMIZATION: Edit config section below for your project specifics
+
+name: Production Readiness
+version: 1.0.0
+description: Automated production hardening for AEM projects
+
+# ============================================================================
+# PROJECT CONFIGURATION - CUSTOMIZE THIS SECTION
+# ============================================================================
+config:
+  project:
+    name: "${PROJECT_NAME:-aem-bmad-showcase}"
+    group_id: "${GROUP_ID:-com.example.aem.bmad}"
+    package_base: "${PACKAGE_BASE:-com.example.aem.bmad.core}"
+    resource_type_prefix: "${RESOURCE_TYPE_PREFIX:-bmad-showcase}"
+
+  # Java/Build Configuration
+  build:
+    java_version: 21
+    node_version: "18.19.0"
+    npm_version: "9.8.1"
+    maven_version: "3.9.0"
+
+  # Third-Party Integrations - Enable/Disable as needed
+  integrations:
+    llm:
+      enabled: true
+      providers:
+        - name: claude
+          class: ClaudeServiceImpl
+          secret_key: CLAUDE_API_KEY
+        - name: openai
+          class: OpenAIServiceImpl
+          secret_key: OPENAI_API_KEY
+    email:
+      enabled: true
+      provider: sendgrid
+      class: EmailServiceImpl
+      secret_key: SENDGRID_API_KEY
+    analytics:
+      enabled: true
+      provider: adobe_analytics
+      # Set to false if not using Adobe Analytics
+    personalization:
+      enabled: true
+      provider: adobe_target
+      # Set to false if not using Adobe Target
+
+  # Test Configuration
+  testing:
+    unit_coverage_target: 80
+    integration_tests: true
+    e2e_tests: true
+    accessibility_tests: true
+    performance_tests: true
+
+  # Resilience Configuration
+  resilience:
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 50
+      wait_duration_seconds: 30
+    retry:
+      max_attempts: 3
+      backoff_multiplier: 2
+    rate_limiting:
+      enabled: true
+      # Customize per service in tasks section
+
+  # Monitoring Configuration
+  monitoring:
+    health_checks: true
+    metrics: true
+    # Provider: datadog, newrelic, prometheus, cloudwatch
+    provider: "${MONITORING_PROVIDER:-prometheus}"
+
+# ============================================================================
+# WORKFLOW PHASES
+# ============================================================================
+phases:
+  # --------------------------------------------------------------------------
+  # Phase 1: Foundation (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: foundation
+    description: Security and code foundation
+    tasks:
+      - id: PROD-002
+        name: Fix Node/NPM Version
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - update_pom_node_version
+          - update_pom_npm_version
+          - update_frontend_maven_plugin
+        files:
+          - pom.xml
+        config_ref: config.build
+
+      - id: PROD-004
+        name: Add Input Validation
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - add_validation_annotations
+          - add_url_validator
+          - add_xss_sanitizer
+          - update_model_tests
+        files:
+          - "${config.package_base}/models/*.java"
+          - "${config.package_base}/util/ValidationUtils.java"
+        validation_rules:
+          urls:
+            patterns: ["^/", "^https://"]
+            max_length: 2048
+            block_protocols: ["javascript:", "data:"]
+          text:
+            max_length: 10000
+            strip_html: true
+
+      - id: PROD-005
+        name: Implement Structured Logging
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - create_logging_utils
+          - create_pii_masker
+          - update_services_logging
+          - add_correlation_ids
+        files:
+          - "${config.package_base}/util/LoggingUtils.java"
+          - "${config.package_base}/util/PiiMasker.java"
+          - "${config.package_base}/filter/CorrelationIdFilter.java"
+        pii_fields:
+          - email
+          - apiKey
+          - password
+          - token
+          - creditCard
+          - ssn
+          - phone
+
+      - id: PROD-006
+        name: Add Error Handling
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - create_exception_hierarchy
+          - create_error_codes
+          - create_error_response_dto
+          - update_services
+        files:
+          - "${config.package_base}/exception/*.java"
+          - "${config.package_base}/dto/ErrorResponse.java"
+        exception_types:
+          - BmadException (base)
+          - ServiceException
+          - ValidationException
+          - IntegrationException
+
+  # --------------------------------------------------------------------------
+  # Phase 2: Service Testing (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: service_testing
+    description: Comprehensive service layer tests
+    depends_on: [foundation]
+    tasks:
+      - id: PROD-003
+        name: Service Unit Tests
+        agent: aem-test-writer
+        type: automated
+        actions:
+          - create_service_tests
+          - create_mock_factories
+          - add_error_scenario_tests
+        files:
+          - "${config.package_base}/services/impl/*Test.java"
+        services_to_test:
+          # Dynamically generated based on config.integrations
+          - name: HttpClientService
+            test_scenarios:
+              - success_response
+              - timeout
+              - connection_error
+              - retry_logic
+          - name: ClaudeService
+            enabled: "${config.integrations.llm.enabled}"
+            test_scenarios:
+              - generate_success
+              - api_error
+              - rate_limited
+              - invalid_response
+          - name: OpenAIService
+            enabled: "${config.integrations.llm.enabled}"
+            test_scenarios:
+              - generate_success
+              - api_error
+              - token_limit
+          - name: EmailService
+            enabled: "${config.integrations.email.enabled}"
+            test_scenarios:
+              - send_success
+              - invalid_email
+              - smtp_error
+              - attachment
+
+  # --------------------------------------------------------------------------
+  # Phase 3: Resilience (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: resilience
+    description: Add resilience patterns
+    depends_on: [service_testing]
+    condition: "${config.resilience.circuit_breaker.enabled}"
+    tasks:
+      - id: PROD-007
+        name: Circuit Breaker Implementation
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - add_resilience4j_dependency
+          - create_circuit_breaker_config
+          - wrap_http_calls
+          - add_fallback_methods
+          - add_metrics
+        files:
+          - pom.xml
+          - "${config.package_base}/resilience/CircuitBreakerConfig.java"
+          - "${config.package_base}/services/impl/*ServiceImpl.java"
+        circuit_breaker_config:
+          failure_rate_threshold: "${config.resilience.circuit_breaker.failure_threshold}"
+          wait_duration_in_open_state: "${config.resilience.circuit_breaker.wait_duration_seconds}s"
+          permitted_calls_in_half_open: 5
+          sliding_window_size: 10
+
+  # --------------------------------------------------------------------------
+  # Phase 4: Integration Testing (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: integration_testing
+    description: Integration and E2E tests
+    depends_on: [resilience]
+    condition: "${config.testing.integration_tests}"
+    tasks:
+      - id: PROD-008
+        name: Integration Tests
+        agent: aem-test-writer
+        type: automated
+        actions:
+          - create_integration_test_module
+          - add_testcontainers
+          - create_component_integration_tests
+          - create_servlet_tests
+          - create_service_integration_tests
+        files:
+          - it.tests/pom.xml
+          - it.tests/src/test/java/**/*IT.java
+
+      - id: PROD-009
+        name: E2E Tests
+        agent: aem-test-writer
+        type: automated
+        condition: "${config.testing.e2e_tests}"
+        actions:
+          - expand_playwright_tests
+          - add_author_tests
+          - add_publish_tests
+          - add_visual_regression
+        files:
+          - ui.tests/playwright/tests/*.spec.ts
+
+      - id: PROD-010
+        name: Frontend Tests
+        agent: aem-test-writer
+        type: automated
+        actions:
+          - configure_jest
+          - configure_eslint
+          - create_component_tests
+          - create_utility_tests
+        files:
+          - ui.frontend/jest.config.js
+          - ui.frontend/.eslintrc.js
+          - ui.frontend/src/**/*.test.js
+
+  # --------------------------------------------------------------------------
+  # Phase 5: Infrastructure (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: infrastructure
+    description: Dispatcher and health checks
+    depends_on: [integration_testing]
+    tasks:
+      - id: PROD-011
+        name: Dispatcher Hardening
+        agent: aem-dispatcher-config
+        type: automated
+        actions:
+          - restrict_json_caching
+          - add_security_headers
+          - add_rate_limiting
+          - add_health_endpoint_rules
+        files:
+          - dispatcher/src/conf.dispatcher.d/filters/*.any
+          - dispatcher/src/conf.d/available_vhosts/*.vhost
+
+      - id: PROD-012
+        name: Health Check Endpoints
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - create_health_servlet
+          - create_readiness_servlet
+          - add_dependency_checks
+        files:
+          - "${config.package_base}/servlets/HealthCheckServlet.java"
+          - "${config.package_base}/servlets/ReadinessServlet.java"
+        health_checks:
+          - name: repository
+            type: jcr
+          - name: llm_service
+            enabled: "${config.integrations.llm.enabled}"
+          - name: email_service
+            enabled: "${config.integrations.email.enabled}"
+
+  # --------------------------------------------------------------------------
+  # Phase 6: Contract Testing (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: contract_testing
+    description: API contract testing
+    depends_on: [infrastructure]
+    tasks:
+      - id: PROD-017
+        name: Contract Tests
+        agent: aem-test-writer
+        type: automated
+        actions:
+          - add_wiremock_dependency
+          - create_api_contracts
+          - create_contract_tests
+        files:
+          - "${config.package_base}/contracts/*.json"
+          - "${config.package_base}/services/impl/*ContractTest.java"
+
+      - id: PROD-023
+        name: Mock Services
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - create_wiremock_stubs
+          - create_docker_compose
+          - document_mock_usage
+        files:
+          - mocks/wiremock/**/*.json
+          - docker-compose.dev.yml
+
+  # --------------------------------------------------------------------------
+  # Phase 7: Fallbacks & Rate Limiting (AI Automated)
+  # --------------------------------------------------------------------------
+  - name: fallbacks
+    description: Graceful degradation
+    depends_on: [contract_testing]
+    tasks:
+      - id: PROD-021
+        name: Fallback Strategies
+        agent: aem-component-coder
+        type: automated
+        actions:
+          - implement_llm_fallback_chain
+          - implement_email_queue
+          - implement_analytics_buffer
+          - add_static_fallback_content
+        files:
+          - "${config.package_base}/resilience/FallbackService.java"
+          - "${config.package_base}/resilience/FallbackChain.java"
+        fallback_chains:
+          llm:
+            - primary: claude
+            - fallback_1: openai
+            - fallback_2: cached_response
+            - fallback_3: static_content
+
+      - id: PROD-022
+        name: Rate Limiting
+        agent: aem-component-coder
+        type: automated
+        condition: "${config.resilience.rate_limiting.enabled}"
+        actions:
+          - create_rate_limiter
+          - configure_per_service_limits
+          - add_queue_handling
+        files:
+          - "${config.package_base}/resilience/RateLimiter.java"
+          - "${config.package_base}/resilience/RequestQueue.java"
+        rate_limits:
+          claude_api:
+            requests_per_minute: 60
+            tokens_per_minute: 100000
+          openai_api:
+            requests_per_minute: 60
+            tokens_per_minute: 90000
+          email_api:
+            requests_per_second: 10
+            daily_limit: 10000
+
+# ============================================================================
+# HUMAN-REQUIRED TASKS (Flagged for manual completion)
+# ============================================================================
+human_tasks:
+  - id: PROD-001
+    name: Move API Keys to Cloud Manager
+    type: manual
+    reason: Requires Cloud Manager UI access and permissions
+    instructions:
+      - Login to Cloud Manager
+      - Navigate to Environment > Variables
+      - Add secrets for each integration
+      - "Secrets needed: ${config.integrations.*.secret_key}"
+    verification:
+      - Deploy to environment
+      - Verify services authenticate successfully
+
+  - id: PROD-013
+    name: Performance Testing
+    type: manual
+    reason: Requires infrastructure and real load generation
+    instructions:
+      - Set up load testing infrastructure
+      - Run k6 scripts from scripts/testing/
+      - Analyze results
+      - Document baselines
+    artifacts_provided:
+      - scripts/testing/k6-load-test.js
+
+  - id: PROD-014
+    name: Security Scanning
+    type: manual
+    reason: Requires tool installation and policy decisions
+    instructions:
+      - Install OWASP Dependency Check
+      - Configure in Cloud Manager pipeline
+      - Run initial scan
+      - Remediate findings
+      - Create suppression file for false positives
+
+  - id: PROD-016
+    name: Runbook Testing
+    type: manual
+    reason: Requires real environment execution
+    instructions:
+      - Schedule runbook drill
+      - Execute each procedure in stage
+      - Document gaps
+      - Update runbooks
+
+  - id: PROD-018
+    name: Adobe Analytics Testing
+    type: manual
+    condition: "${config.integrations.analytics.enabled}"
+    reason: Requires Adobe Analytics account access
+    instructions:
+      - Verify data layer in browser
+      - Check Adobe Analytics debugger
+      - Validate reports in Analytics UI
+
+  - id: PROD-019
+    name: Adobe Target Testing
+    type: manual
+    condition: "${config.integrations.personalization.enabled}"
+    reason: Requires Adobe Target account access
+    instructions:
+      - Create test activity
+      - Verify variant delivery
+      - Check performance impact
+
+  - id: PROD-020
+    name: Monitoring Setup
+    type: manual
+    reason: Requires monitoring tool access
+    instructions:
+      - Set up ${config.monitoring.provider}
+      - Import dashboard configs
+      - Configure alert rules
+      - Verify metrics flowing
+
+# ============================================================================
+# AGENT ASSIGNMENTS
+# ============================================================================
+agents:
+  aem-component-coder:
+    persona: bmad/gastown/agents/aem-component-coder.md
+    responsibilities:
+      - Sling Models
+      - OSGi Services
+      - Utility classes
+      - Configuration
+
+  aem-test-writer:
+    persona: bmad/gastown/agents/aem-test-writer.md
+    responsibilities:
+      - Unit tests
+      - Integration tests
+      - E2E tests
+      - Contract tests
+
+  aem-dispatcher-config:
+    persona: bmad/gastown/agents/aem-dispatcher-config.md
+    responsibilities:
+      - Dispatcher rules
+      - Security headers
+      - Cache configuration
+
+  aem-code-reviewer:
+    persona: bmad/gastown/agents/aem-code-reviewer.md
+    responsibilities:
+      - Code review
+      - Security review
+      - Best practices
+
+# ============================================================================
+# EXECUTION SETTINGS
+# ============================================================================
+execution:
+  # Run phases sequentially or in parallel where possible
+  mode: sequential
+
+  # Create BEAD issues for tracking
+  create_bead_issues: true
+
+  # Require human review before merge
+  require_review: true
+
+  # Auto-commit after each task
+  auto_commit: false
+
+  # Branch strategy
+  branching:
+    base: main
+    feature_prefix: "prod-ready/"
+    # Creates: prod-ready/PROD-002, prod-ready/PROD-003, etc.
+
+# ============================================================================
+# OUTPUT CONFIGURATION
+# ============================================================================
+output:
+  # Generate summary report
+  report: true
+  report_path: bmad/gastown/bead/.issues/production-readiness-report.md
+
+  # Track in BEAD
+  bead_directory: bmad/gastown/bead/.issues/prod-ready/
+
+  # Notify on completion
+  notifications:
+    slack: "${SLACK_WEBHOOK:-}"
+    email: "${NOTIFICATION_EMAIL:-}"

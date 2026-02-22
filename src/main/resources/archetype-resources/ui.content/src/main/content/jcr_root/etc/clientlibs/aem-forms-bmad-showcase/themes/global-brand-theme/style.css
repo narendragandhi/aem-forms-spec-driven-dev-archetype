@@ -1,0 +1,74 @@
+/*
+ * Global Brand Theme for AEM Forms BMAD Showcase
+ *
+ * This file contains basic styles for demonstrating a custom theme.
+ * In a real project, this would be more extensive and likely generated from SASS/LESS.
+ */
+
+:root {
+  /* Colors */
+  --theme-primary-color: #005a9e; /* Primary Blue */
+  --theme-accent-color: #ff7a00; /* Accent Orange */
+  --theme-text-color: #333333;
+  --theme-background-color: #f8f8f8;
+
+  /* Fonts */
+  --theme-font-family-body: 'Roboto', sans-serif;
+  --theme-font-family-heading: 'Montserrat', sans-serif;
+
+  /* Field Styling */
+  --theme-field-border-color: #cccccc;
+  --theme-field-focus-border-color: var(--theme-primary-color);
+  --theme-field-label-color: #666666;
+}
+
+/* Apply basic font styles to the form container */
+.cmp-adaptiveform-container {
+  font-family: var(--theme-font-family-body);
+  color: var(--theme-text-color);
+  background-color: var(--theme-background-color);
+}
+
+/* Style for form headings */
+.cmp-adaptiveform-text__heading,
+.cmp-adaptiveform-title {
+  font-family: var(--theme-font-family-heading);
+  color: var(--theme-primary-color);
+}
+
+/* Style for input fields (example: border, focus) */
+.cmp-adaptiveform-textinput__widget,
+.cmp-adaptiveform-textarea__widget {
+  border: 1px solid var(--theme-field-border-color);
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: border-color 0.3s ease;
+}
+
+.cmp-adaptiveform-textinput__widget:focus,
+.cmp-adaptiveform-textarea__widget:focus {
+  border-color: var(--theme-field-focus-border-color);
+  outline: none;
+}
+
+/* Style for primary buttons */
+.cmp-adaptiveform-button__widget--primary {
+  background-color: var(--theme-primary-color);
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.cmp-adaptiveform-button__widget--primary:hover {
+  background-color: darken(var(--theme-primary-color), 10%); /* Requires SASS/LESS or JS for darken() */
+}
+
+/* Basic error message style */
+.cmp-adaptiveform-field__errormessage {
+  color: #dc3545; /* Bootstrap danger red */
+  font-size: 0.875em;
+  margin-top: 5px;
+}

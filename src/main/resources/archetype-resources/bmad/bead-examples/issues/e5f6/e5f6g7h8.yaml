@@ -1,0 +1,197 @@
+# BEAD Issue: Hero Component Unit Tests
+# Agent: AEM Test Writer
+# Parent Task: BMAD Sprint 1 - Test Hero Component
+
+id: e5f6g7h8
+type: task
+title: "Create Unit Tests for Hero Component"
+status: completed
+priority: high
+created: "2024-02-08T09:00:00Z"
+updated: "2024-02-08T14:00:00Z"
+agent: aem-test-writer
+
+# Traceability
+traces_to:
+  user_story: "US-CA-003"
+  specification: "SPEC-HERO-001"
+  code_under_test:
+    - "CODE-HERO-001"  # HeroModel.java
+  acceptance_criteria:
+    - "US-CA-003.AC2"  # i18n support
+    - "US-CA-003.AC4"  # External URL support
+
+# Dependencies
+dependencies:
+  - a1b2c3d4  # Hero component implementation must be complete
+blocks: []
+
+# Context (Persistent Memory)
+context:
+  test_strategy:
+    framework: "JUnit 5 + AEM Mock"
+    coverage_target: "80%"
+    test_categories:
+      - "Fully configured component"
+      - "Partially configured component"
+      - "Empty component"
+      - "i18n compliance"
+      - "External URL handling"
+
+  requirements_from_handoff:
+    - "All fields are optional, test null handling"
+    - "Test unicode characters for i18n compliance"
+    - "Test external URL handling for CTA link"
+    - "HTL uses 'uri' context for backgroundImage XSS protection"
+
+  relevant_files:
+    - path: "core/src/main/java/com/example/aem/bmad/core/models/HeroModel.java"
+      summary: "Sling Model with 5 optional String fields"
+
+    - path: "bmad/05-Testing-and-Deployment/testing-strategy.md"
+      section: "Unit Testing"
+      summary: "JUnit/Mockito, 80% coverage, fail build on test failure"
+
+  aem_mock_patterns:
+    resource_creation: |
+      context.create().resource(RESOURCE_PATH,
+          "sling:resourceType", HeroModel.RESOURCE_TYPE,
+          "heading", TEST_HEADING
+      );
+
+    model_adaptation: |
+      Resource resource = context.resourceResolver().getResource(RESOURCE_PATH);
+      context.request().setResource(resource);
+      HeroModel model = context.request().adaptTo(HeroModel.class);
+
+# Test Cases Designed
+test_cases:
+  - id: "TC-HERO-001"
+    name: "shouldInstantiateModel"
+    category: "Fully configured"
+    description: "Verify model instantiation with all fields populated"
+    status: "passed"
+
+  - id: "TC-HERO-002"
+    name: "shouldReturnHeading"
+    category: "Fully configured"
+    description: "Verify heading getter returns configured value"
+    status: "passed"
+
+  - id: "TC-HERO-003"
+    name: "shouldReturnSubheading"
+    category: "Fully configured"
+    description: "Verify subheading getter returns configured value"
+    status: "passed"
+
+  - id: "TC-HERO-004"
+    name: "shouldReturnBackgroundImage"
+    category: "Fully configured"
+    description: "Verify background image path is returned correctly"
+    status: "passed"
+
+  - id: "TC-HERO-005"
+    name: "shouldReturnCtaButtonText"
+    category: "Fully configured"
+    description: "Verify CTA button text is returned correctly"
+    status: "passed"
+
+  - id: "TC-HERO-006"
+    name: "shouldReturnCtaButtonLink"
+    category: "Fully configured"
+    description: "Verify CTA button link is returned correctly"
+    status: "passed"
+
+  - id: "TC-HERO-007"
+    name: "shouldReturnCorrectExportedType"
+    category: "Fully configured"
+    description: "Verify exported type matches resource type for headless"
+    status: "passed"
+
+  - id: "TC-HERO-008"
+    name: "shouldHandlePartialConfiguration"
+    category: "Partially configured"
+    description: "Verify graceful handling when only some fields are set"
+    status: "passed"
+
+  - id: "TC-HERO-009"
+    name: "shouldHandleEmptyComponent"
+    category: "Empty component"
+    description: "Verify model instantiates with all null fields"
+    status: "passed"
+
+  - id: "TC-HERO-010"
+    name: "shouldSupportUnicodeInHeading"
+    category: "i18n compliance"
+    description: "Verify unicode characters preserved (French, Chinese)"
+    traces_to_ac: "US-CA-003.AC2"
+    status: "passed"
+
+  - id: "TC-HERO-011"
+    name: "shouldSupportSpecialCharactersInCtaText"
+    category: "i18n compliance"
+    description: "Verify special characters like arrows preserved"
+    traces_to_ac: "US-CA-003.AC2"
+    status: "passed"
+
+  - id: "TC-HERO-012"
+    name: "shouldSupportExternalUrls"
+    category: "External URL handling"
+    description: "Verify external HTTPS URLs work for CTA link"
+    traces_to_ac: "US-CA-003.AC4"
+    status: "passed"
+
+# Execution Log
+execution_log:
+  - timestamp: "2024-02-08T09:15:00Z"
+    action: "Started test development"
+    details: "Read handoff notes from component coder agent"
+
+  - timestamp: "2024-02-08T09:30:00Z"
+    action: "Created test class structure"
+    details: "Set up HeroModelTest.java with AemContextExtension"
+
+  - timestamp: "2024-02-08T10:30:00Z"
+    action: "Implemented core tests"
+    details: "Created tests for all getters with fully configured component"
+
+  - timestamp: "2024-02-08T11:30:00Z"
+    action: "Added edge case tests"
+    details: "Tests for partial config, empty component, null handling"
+
+  - timestamp: "2024-02-08T12:30:00Z"
+    action: "Added i18n tests"
+    details: "Unicode and special character tests per AC2"
+
+  - timestamp: "2024-02-08T13:00:00Z"
+    action: "Added external URL test"
+    details: "External URL test per AC4"
+
+  - timestamp: "2024-02-08T13:30:00Z"
+    action: "Ran test suite"
+    details: "All 12 tests passed, coverage at 95%"
+
+  - timestamp: "2024-02-08T14:00:00Z"
+    action: "Completed"
+    details: "Test class committed, ready for CI pipeline"
+
+# Test Results
+test_results:
+  total: 12
+  passed: 12
+  failed: 0
+  skipped: 0
+  coverage: "95%"
+  execution_time: "1.2s"
+
+# Artifacts Produced
+artifacts:
+  - type: "java-test"
+    path: "core/src/test/java/com/example/aem/bmad/core/models/HeroModelTest.java"
+    status: "committed"
+
+# Notes
+notes: |
+  All tests passing with 95% coverage. Tests follow BDD style with
+  @Nested classes grouping related scenarios. Each test traces back
+  to specific acceptance criteria for full traceability.

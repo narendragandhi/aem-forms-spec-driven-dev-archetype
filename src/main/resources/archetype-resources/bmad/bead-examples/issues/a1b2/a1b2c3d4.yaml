@@ -1,0 +1,134 @@
+# BEAD Issue: Hero Component Implementation
+# Agent: AEM Component Coder
+# Parent Task: BMAD Sprint 1 - Develop Hero Component
+
+id: a1b2c3d4
+type: epic
+title: "Implement Hero Component"
+status: completed
+priority: high
+created: "2024-02-07T10:00:00Z"
+updated: "2024-02-08T16:30:00Z"
+agent: aem-component-coder
+
+# Traceability
+traces_to:
+  user_story: "US-CA-003"
+  specification: "SPEC-HERO-001"
+  acceptance_criteria:
+    - "US-CA-003.AC1"
+    - "US-CA-003.AC2"
+    - "US-CA-003.AC3"
+    - "US-CA-003.AC4"
+    - "US-CA-003.AC5"
+    - "US-CA-003.AC6"
+
+# Dependencies
+dependencies: []
+blocks:
+  - e5f6g7h8  # Unit tests depend on this
+
+# Sub-tasks
+children:
+  - id: i9j0k1l2
+    title: "Create Hero Sling Model"
+    status: completed
+  - id: m3n4o5p6
+    title: "Develop Hero HTL Template"
+    status: completed
+  - id: q7r8s9t0
+    title: "Create Component Dialog"
+    status: completed
+
+# Context (Persistent Memory)
+context:
+  design_decisions:
+    - decision: "Use @ValueMapValue for property injection"
+      reason: "Simpler than @Inject, works well for JCR properties"
+      date: "2024-02-07"
+
+    - decision: "Implement ComponentExporter interface"
+      reason: "Required for headless/SPA use cases and JSON export"
+      date: "2024-02-07"
+
+    - decision: "Make all fields @Optional"
+      reason: "Component should render gracefully with partial content"
+      date: "2024-02-07"
+
+  requirements_understood:
+    - "Hero needs heading, subheading, background image, CTA button"
+    - "All text fields must support i18n"
+    - "Component must be WCAG 2.1 AA compliant"
+    - "Responsive design required for mobile/tablet/desktop"
+
+  relevant_files:
+    - path: "bmad/03-Architecture-Design/component-design.md"
+      section: "Hero Component"
+      summary: "Defines Sling Model interface, dialog fields, HTL requirements"
+
+    - path: "bmad/02-Model-Definition/design-system.md"
+      section: "Hero Component Tokens"
+      summary: "CSS variables for hero styling including colors, spacing"
+
+  code_snippets:
+    sling_model_signature: |
+      @Model(adaptables = SlingHttpServletRequest.class,
+             adapters = {HeroModel.class, ComponentExporter.class},
+             resourceType = HeroModel.RESOURCE_TYPE)
+      @Exporter(name = ExporterConstants.SLING_MODEL_EXPORTER_NAME,
+                extensions = ExporterConstants.SLING_MODEL_EXTENSION)
+      public class HeroModel implements ComponentExporter
+
+# Execution Log
+execution_log:
+  - timestamp: "2024-02-07T10:15:00Z"
+    action: "Started implementation"
+    details: "Read component-design.md for requirements"
+
+  - timestamp: "2024-02-07T11:00:00Z"
+    action: "Created HeroModel.java"
+    details: "Implemented Sling Model with 5 properties"
+    artifacts:
+      - "core/src/main/java/com/example/aem/bmad/core/models/HeroModel.java"
+
+  - timestamp: "2024-02-07T14:00:00Z"
+    action: "Created hero.html"
+    details: "HTL template with design system classes"
+    artifacts:
+      - "ui.apps/src/main/content/jcr_root/apps/aem-bmad-showcase/components/content/hero/hero.html"
+
+  - timestamp: "2024-02-07T16:00:00Z"
+    action: "Created component dialog"
+    details: "Dialog with all required fields, i18n enabled"
+    artifacts:
+      - "ui.apps/src/main/content/jcr_root/apps/aem-bmad-showcase/components/content/hero/_cq_dialog/.content.xml"
+
+  - timestamp: "2024-02-08T10:00:00Z"
+    action: "Code review feedback"
+    details: "Added ARIA attributes for accessibility per AC5"
+
+  - timestamp: "2024-02-08T16:30:00Z"
+    action: "Completed"
+    details: "All acceptance criteria verified, ready for testing"
+
+# Artifacts Produced
+artifacts:
+  - type: "java"
+    path: "core/src/main/java/com/example/aem/bmad/core/models/HeroModel.java"
+    status: "committed"
+
+  - type: "htl"
+    path: "ui.apps/src/main/content/jcr_root/apps/aem-bmad-showcase/components/content/hero/hero.html"
+    status: "committed"
+
+  - type: "xml"
+    path: "ui.apps/src/main/content/jcr_root/apps/aem-bmad-showcase/components/content/hero/_cq_dialog/.content.xml"
+    status: "committed"
+
+# Notes for Next Agent
+handoff_notes: |
+  Hero component implementation complete. Key notes for test writer:
+  - All fields are optional, test null handling
+  - Test unicode characters for i18n compliance
+  - Test external URL handling for CTA link
+  - HTL uses 'uri' context for backgroundImage XSS protection

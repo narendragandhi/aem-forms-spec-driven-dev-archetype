@@ -1,0 +1,250 @@
+# Bug Fix Workflow
+# Orchestrates investigation and resolution of bugs
+
+name: Bug Fix
+version: "1.0"
+description: Workflow for investigating, fixing, and validating bug fixes
+
+metadata:
+  author: BMAD Methodology
+  category: maintenance
+
+trigger:
+  type: manual
+  inputs:
+    - name: bug_id
+      type: string
+      required: true
+      description: Bug identifier or JIRA ticket number
+    - name: severity
+      type: enum
+      values: [critical, major, minor, trivial]
+      required: true
+    - name: affected_component
+      type: string
+      required: false
+      description: Component name if known
+    - name: reproduction_steps
+      type: string
+      required: true
+      description: Steps to reproduce the bug
+
+agents:
+  - id: mayor
+    type: mayor
+    persona: gastown/agents/mayor.md
+  - id: coder
+    type: aem-component-coder
+    persona: gastown/agents/aem-component-coder.md
+  - id: tester
+    type: aem-test-writer
+    persona: gastown/agents/aem-test-writer.md
+  - id: reviewer
+    type: aem-code-reviewer
+    persona: gastown/agents/aem-code-reviewer.md
+
+inputs:
+  - path: bmad/04-Development-Sprint/development-guidelines.md
+    required: true
+  - path: bmad/03-Architecture-Design/component-design.md
+    required: false
+
+phases:
+  # Phase 1: Triage
+  - id: triage
+    name: Bug Triage & Analysis
+    agent: mayor
+    description: Analyze bug report and assign investigation
+    actions:
+      - action: analyze_bug_report
+        inputs:
+          - bug_id
+          - reproduction_steps
+      - action: identify_affected_areas
+        outputs:
+          - affected_files
+          - affected_components
+      - action: create_bead_issues
+        outputs:
+          - investigation_issue
+          - fix_issue
+          - test_issue
+      - action: assign_agents
+    outputs:
+      - path: bead/.issues/coder/${bug_id}-investigation.md
+      - path: bead/.issues/coder/${bug_id}-fix.md
+      - path: bead/.issues/tester/${bug_id}-test.md
+    success_criteria:
+      - Root cause hypothesis documented
+      - BEAD issues created
+
+  # Phase 2: Investigation
+  - id: investigation
+    name: Bug Investigation
+    agent: coder
+    depends_on: [triage]
+    description: Deep dive into bug cause
+    actions:
+      - action: reproduce_bug
+        description: Verify reproduction steps work
+      - action: analyze_code_path
+        inputs:
+          - affected_files
+      - action: identify_root_cause
+        outputs:
+          - root_cause_analysis
+      - action: propose_fix
+        outputs:
+          - fix_proposal
+    outputs:
+      - root_cause_analysis
+      - fix_proposal
+    success_criteria:
+      - Bug reproduced
+      - Root cause identified
+      - Fix approach documented
+
+  # Phase 3: Create Regression Test
+  - id: regression_test
+    name: Create Regression Test
+    agent: tester
+    depends_on: [investigation]
+    description: Write test that fails before fix
+    actions:
+      - action: create_failing_test
+        description: Test must fail with current code
+        outputs:
+          - path: core/src/test/java/**/regression/${BugId}RegressionTest.java
+      - action: verify_test_fails
+    outputs:
+      - path: core/src/test/java/**/regression/${BugId}RegressionTest.java
+    success_criteria:
+      - Test reproduces bug
+      - Test fails with current code
+
+  # Phase 4: Implementation
+  - id: implementation
+    name: Bug Fix Implementation
+    agent: coder
+    depends_on: [regression_test]
+    description: Implement the fix
+    actions:
+      - action: implement_fix
+        inputs:
+          - fix_proposal
+          - root_cause_analysis
+      - action: verify_regression_test_passes
+      - action: run_all_tests
+    outputs:
+      - modified_files
+    success_criteria:
+      - Regression test passes
+      - All existing tests pass
+      - No new warnings
+
+  # Phase 5: Expanded Testing
+  - id: expanded_testing
+    name: Expanded Test Coverage
+    agent: tester
+    depends_on: [implementation]
+    description: Add edge case and integration tests
+    actions:
+      - action: create_edge_case_tests
+      - action: create_integration_tests
+        condition: "${severity} in ['critical', 'major']"
+      - action: run_full_test_suite
+    outputs:
+      - test_results
+    success_criteria:
+      - All tests pass
+      - Edge cases covered
+      - No regression in other areas
+
+  # Phase 6: Code Review
+  - id: review
+    name: Fix Review
+    agent: reviewer
+    depends_on: [expanded_testing]
+    description: Review the fix for quality and side effects
+    actions:
+      - action: review_fix
+        focus: [correctness, side_effects, performance]
+      - action: review_tests
+        focus: [coverage, edge_cases]
+      - action: check_for_similar_issues
+        description: Look for same pattern elsewhere
+    outputs:
+      - review_report
+      - similar_issues
+    success_criteria:
+      - Fix is correct
+      - No unintended side effects
+      - Tests adequate
+
+  # Phase 7: Completion
+  - id: completion
+    name: Bug Fix Completion
+    agent: mayor
+    depends_on: [review]
+    condition: "${review.approved} == true"
+    actions:
+      - action: verify_all_tests_pass
+      - action: close_bead_issues
+      - action: generate_fix_summary
+        outputs:
+          - fix_summary
+      - action: create_followup_issues
+        condition: "${review.similar_issues} exists"
+        description: Create issues for similar bugs found
+    outputs:
+      - path: bead/.issues/completed/${bug_id}-summary.md
+    success_criteria:
+      - All phases completed
+      - All BEAD issues closed
+      - Summary generated
+
+quality_gates:
+  - name: regression_test_exists
+    phase: regression_test
+    check: test_file_exists
+    required: true
+  - name: regression_test_fails
+    phase: regression_test
+    check: test_fails_before_fix
+    required: true
+  - name: regression_test_passes
+    phase: implementation
+    check: test_passes_after_fix
+    required: true
+  - name: all_tests_pass
+    phase: expanded_testing
+    check: mvn test
+    required: true
+
+notifications:
+  on_phase_complete:
+    - log: "Phase ${phase.name} completed"
+  on_failure:
+    - log: "Phase ${phase.name} failed: ${error}"
+    - escalate_if: "${severity} == 'critical'"
+
+timeouts:
+  phase_default: 30m
+  workflow_max: 3h
+  critical_bug_max: 1h
+
+priority_handling:
+  critical:
+    parallel_investigation: true
+    escalate_on_block: true
+    max_wait_time: 15m
+  major:
+    parallel_investigation: false
+    escalate_on_block: true
+    max_wait_time: 30m
+  minor:
+    parallel_investigation: false
+    escalate_on_block: false
+  trivial:
+    parallel_investigation: false
+    escalate_on_block: false

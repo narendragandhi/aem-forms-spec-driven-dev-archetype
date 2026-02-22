@@ -1,0 +1,103 @@
+# BEAD Issue: Address Lookup Form Component Implementation
+# Agent: AEM Forms React Coder
+# Parent Task: BMAD Sprint 2 - Develop Custom Form Components
+
+id: f4a5b6c7
+type: epic
+title: "Implement Address Lookup Adaptive Form Component"
+status: completed
+priority: high
+created: "2026-02-18T10:00:00Z"
+updated: "2026-02-18T17:00:00Z"
+agent: aem-forms-react-coder
+
+# Traceability
+traces_to:
+  user_story: "US-LOAN-005"
+  specification: "SPEC-ADDR-LOOKUP-001"
+  acceptance_criteria:
+    - "US-LOAN-005.AC1"
+    - "US-LOAN-005.AC2"
+    - "US-LOAN-005.AC3"
+
+# Dependencies
+dependencies: []
+
+# Sub-tasks
+children:
+  - id: g8h9i0j1
+    title: "Create React component for Address Lookup"
+    status: completed
+  - id: k2l3m4n5
+    title: "Develop AEM Forms authoring dialog (dialog.json)"
+    status: completed
+  - id: o6p7q8r9
+    title: "Create AEM Forms integration wrapper"
+    status: completed
+
+# Context (Persistent Memory)
+context:
+  design_decisions:
+    - decision: "Use @aem-forms/af-react-components 'Field' for integration"
+      reason: "Ensures proper data binding and rule engine integration."
+      date: "2026-02-18"
+    - decision: "Externalize API Key"
+      reason: "API key for address service should be managed via OSGi configuration, not hardcoded."
+      date: "2026-02-18"
+
+  requirements_understood:
+    - "Component must provide a text input for autocomplete."
+    - "It must call a third-party address API as the user types."
+    - "Selecting a suggested address must populate multiple fields in the Form Data Model (street, city, state, zip)."
+    - "Component must be stylable via the AEM Forms Theme Editor."
+
+  relevant_files:
+    - path: "bmad/02-Model-Definition/content-models.md"
+      section: "Address Lookup Component"
+      summary: "Defines the component's purpose, authoring fields, and data binding requirements."
+
+# Execution Log
+execution_log:
+  - timestamp: "2026-02-18T10:30:00Z"
+    action: "Started implementation"
+    details: "Read content-models.md for requirements. Scaffolding React component file."
+
+  - timestamp: "2026-02-18T11:30:00Z"
+    action: "Created CustomAddressField.js"
+    details: "Implemented basic React component structure with input field."
+    artifacts:
+      - "ui.frontend.react.forms.af/src/main/webpack/components/CustomAddressField.js"
+
+  - timestamp: "2026-02-18T14:00:00Z"
+    action: "Created AEM Forms wrapper"
+    details: "Wrapped the React component using the 'Field' component from the AEM Forms library to handle data binding."
+    artifacts:
+      - "ui.frontend.react.forms.af/src/main/webpack/components/CustomAddressField.js" # Updated file
+
+  - timestamp: "2026-02-18T15:30:00Z"
+    action: "Created dialog.json for authoring"
+    details: "Created the JSON structure for the component's authoring dialog to configure label, description, and data binding."
+    artifacts:
+      - "ui.apps/src/main/content/jcr_root/apps/aem-forms-bmad-showcase/components/adaptiveForm/customaddressfield/_cq_dialog/.content.xml" # Example path
+
+  - timestamp: "2026-02-18T17:00:00Z"
+    action: "Completed"
+    details: "Component is ready for integration testing within an Adaptive Form."
+
+# Artifacts Produced
+artifacts:
+  - type: "javascript"
+    path: "ui.frontend.react.forms.af/src/main/webpack/components/CustomAddressField.js"
+    status: "committed"
+
+  - type: "json"
+    path: "ui.apps/src/main/content/jcr_root/apps/aem-forms-bmad-showcase/components/adaptiveForm/customaddressfield/dialog.json" # Hypothetical path
+    status: "committed"
+
+# Notes for Next Agent
+handoff_notes: |
+  Address Lookup component implementation complete. Notes for the QA/Testing Agent:
+  - Mock the address lookup API to test the suggestion functionality.
+  - Verify that selecting a suggestion correctly populates multiple fields in the form's data model.
+  - Test the component's behavior when the address API fails or returns no results.
+  - Ensure the 'enabled' and 'visible' properties from the rule engine are respected.

@@ -1,0 +1,66 @@
+# BEAD Configuration for AEM BMAD Showcase
+# This configuration defines how AI agents interact with the BEAD system
+
+version: "1.0"
+project:
+  name: "aem-bmad-showcase"
+  description: "AEM as a Cloud Service implementation using BMAD methodology"
+  repository: "https://github.com/example/aem-bmad-showcase"
+
+# AI Agent Definitions
+agents:
+  aem-component-coder:
+    name: "AEM Component Coder"
+    description: "Develops Sling Models, HTL templates, and component dialogs"
+    capabilities:
+      - java
+      - htl
+      - xml
+      - css
+    context_sources:
+      - "../03-Architecture-Design/component-design.md"
+      - "../02-Model-Definition/design-system.md"
+      - "../02-Model-Definition/content-models.md"
+
+  aem-test-writer:
+    name: "AEM Test Writer"
+    description: "Creates JUnit tests, integration tests, and UI tests"
+    capabilities:
+      - junit
+      - mockito
+      - aem-mock
+      - selenium
+    context_sources:
+      - "../05-Testing-and-Deployment/testing-strategy.md"
+      - "../04-Development-Sprint/development-guidelines.md"
+
+  aem-code-reviewer:
+    name: "AEM Code Reviewer"
+    description: "Reviews code for quality, accessibility, and standards compliance"
+    capabilities:
+      - code-review
+      - accessibility-audit
+      - security-review
+    context_sources:
+      - "../04-Development-Sprint/development-guidelines.md"
+      - "../02-Model-Definition/design-system.md"
+
+# Issue Configuration
+issues:
+  id_format: "hash-8"  # 8-character hash IDs
+  storage: "issues/"
+  default_labels:
+    - "aem"
+    - "bmad"
+
+# Context Management
+context:
+  max_tokens: 8000
+  persistence: "git"
+  auto_summarize: true
+
+# Integration with GasTown
+gastown:
+  enabled: true
+  report_to: "mayor-ai"
+  status_updates: "on-transition"

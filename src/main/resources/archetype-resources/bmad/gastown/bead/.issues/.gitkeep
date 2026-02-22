@@ -1,0 +1,11 @@
+# BEAD Issue Directories
+#
+# Issues are organized by assigned agent:
+# - inbox/     - New issues awaiting assignment
+# - coder/     - Component Coder tasks
+# - tester/    - Test Writer tasks
+# - reviewer/  - Code Reviewer tasks
+# - dispatcher/ - Dispatcher Config tasks
+# - docs/      - Documentation Agent tasks
+# - blocked/   - Issues waiting on external input
+# - completed/ - Archived completed issues

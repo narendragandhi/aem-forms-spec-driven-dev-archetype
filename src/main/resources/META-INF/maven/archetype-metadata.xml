@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype-descriptor xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 http://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd"
+    name="aem-forms-bmad-archetype">
+
+    <fileSets>
+        <fileSet filtered="true" packaged="true">
+            <directory>core/src/main/java</directory>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true">
+            <directory>it.tests/src/main/java</directory>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true">
+            <directory>ui.tests/src/main/java</directory>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
+        </fileSet>
+
+        <!-- New fileSet for Sightly HTML files in ui.apps -->
+        <fileSet filtered="false" encoding="UTF-8">
+            <directory>ui.apps/src/main/content</directory>
+            <includes>
+                <include>**/*.html</include>
+            </includes>
+        </fileSet>
+
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory></directory>
+            <includes>
+                <include>**/pom.xml</include>
+            </includes>
+        </fileSet>
+        <!-- Catch-all for everything else, no filtering -->
+        <fileSet filtered="false" encoding="UTF-8">
+            <directory></directory>
+            <excludes>
+                <!-- Exclude directories that are automatically handled by other fileSets -->
+                <exclude>**/src/main/java/**</exclude>
+                <exclude>**/src/test/java/**</exclude>
+
+                <!-- Exclude html files under ui.apps from the unfiltered set -->
+                <exclude>ui.apps/src/main/content/**/*.html</exclude>
+            </excludes>
+        </fileSet>
+    </fileSets>
+
+    <requiredProperties>
+        <requiredProperty key="groupId"/>
+        <requiredProperty key="artifactId"/>
+        <requiredProperty key="version">
+            <defaultValue>1.0.0-SNAPSHOT</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="package">
+            <defaultValue>${groupId}.${artifactId}</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="appName">
+            <defaultValue>${artifactId}</defaultValue>
+        </requiredProperty>
+    </requiredProperties>
+</archetype-descriptor>

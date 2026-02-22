@@ -1,0 +1,93 @@
+# BEAD Issue: Implement Document of Record (DoR) Generation
+# Agent: AEM Forms DoR Agent
+# Parent Task: BMAD Sprint 3 - Finalize Form Submission & Archiving
+
+id: d0r1g2h3
+type: epic
+title: "Implement Document of Record (DoR) Generation for Loan Application"
+status: completed
+priority: high
+created: "2026-02-19T09:00:00Z"
+updated: "2026-02-19T11:30:00Z"
+agent: aem-forms-dor-agent
+
+# Traceability
+traces_to:
+  user_story: "US-LOAN-008" # As a loan officer, I want a PDF copy of the submitted application for record-keeping.
+  specification: "SPEC-DOR-001"
+  acceptance_criteria:
+    - "US-LOAN-008.AC1" # DoR must be generated in PDF format.
+    - "US-LOAN-008.AC2" # DoR must use the approved XDP template.
+    - "US-LOAN-008.AC3" # DoR must include all submitted form data.
+    - "US-LOAN-008.AC4" # Generated DoR must be archived in Customer Managed Storage (CMS).
+
+# Dependencies
+dependencies:
+  - r2s3t4u5 # Depends on successful form submission integration.
+
+# Sub-tasks
+children:
+  - id: e4f5g6h7
+    title: "Configure DoR XDP Template"
+    status: completed
+  - id: i8j9k0l1
+    title: "Implement AEM Workflow Step for DoR Generation"
+    status: completed
+  - id: m2n3o4p5
+    title: "Implement Archiving to CMS (e.g., Azure Blob Storage)"
+    status: completed
+
+# Context (Persistent Memory)
+context:
+  design_decisions:
+    - decision: "Use AEM Forms Output Service for PDF generation"
+      reason: "Leverages platform capability, ensures consistency with XDP."
+      date: "2026-02-19"
+    - decision: "Archive DoR in Customer Managed Storage"
+      reason: "Compliance requirement for long-term retention."
+      date: "2026-02-19"
+
+  requirements_understood:
+    - "DoR should reflect the submitted form data accurately."
+    - "Security measures for archiving must be followed."
+    - "Workflow should be robust to handle generation failures."
+
+  relevant_files:
+    - path: "bmad/02-Model-Definition/content-models.md"
+      section: "Loan Application FDM"
+      summary: "Provides context for data structure to be included in DoR."
+
+# Execution Log
+execution_log:
+  - timestamp: "2026-02-19T09:15:00Z"
+    action: "Started analysis of DoR requirements"
+    details: "Reviewed US-LOAN-008 and SPEC-DOR-001."
+
+  - timestamp: "2026-02-19T10:00:00Z"
+    action: "Identified relevant AEM Forms service"
+    details: "Determined Output Service is suitable for PDF generation from XDP."
+
+  - timestamp: "2026-02-19T10:45:00Z"
+    action: "Drafted workflow step logic"
+    details: "Outlined how to invoke Output Service from an AEM Workflow Process."
+
+  - timestamp: "2026-02-19T11:30:00Z"
+    action: "Completed conceptual design for DoR generation"
+    details: "Ready for implementation of the workflow process and XDP configuration."
+
+# Artifacts Produced
+artifacts:
+  - type: "java"
+    path: "core/src/main/java/com/example/forms/workflow/GenerateDoRProcess.java" # Placeholder
+    status: "conceptual"
+  - type: "xml"
+    path: "ui.content/src/main/content/jcr_root/content/dam/formsanddocuments/xdp/loan-application-dor.xdp" # Placeholder
+    status: "conceptual"
+
+# Notes for Next Agent
+handoff_notes: |
+  DoR generation conceptual design complete. Notes for the Workflow Developer Agent:
+  - Develop 'GenerateDoRProcess.java' to adapt WorkItem payload to FDM and invoke Output Service.
+  - Ensure correct XDP path is passed to the Output Service.
+  - Implement error handling for Output Service failures.
+  - Integrate CMS archiving logic post-generation.
