@@ -16,7 +16,7 @@
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <aem.sdk.api.version>2025.11.23482.20251120T200914Z-251200</aem.sdk.api.version>
+        <aem.sdk.api.version>2026.2.24678.20260226T154829Z-260200</aem.sdk.api.version>
         <aemanalyser.version>1.6.6</aemanalyser.version>
         <maven-bundle-plugin.version>5.1.5</maven-bundle-plugin.version>
     </properties>
@@ -46,6 +46,7 @@
                 <executions>
                     <execution>
                         <id>integration-test</id>
+                        <phase>none</phase>
                         <goals>
                             <goal>integration-test</goal>
                         </goals>
@@ -82,6 +83,33 @@
             <properties>
                 <it.tests.skipFrontend>true</it.tests.skipFrontend>
             </properties>
+        </profile>
+        <profile>
+            <id>generate-from-specs</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.0.0</version>
+                        <executions>
+                            <execution>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>${package}.core.workflow.SpecToCodeGenerator</mainClass>
+                                    <arguments>
+                                        <argument>${project.basedir}/specs/sample-form.json</argument>
+                                        <argument>${project.basedir}/generated-code</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

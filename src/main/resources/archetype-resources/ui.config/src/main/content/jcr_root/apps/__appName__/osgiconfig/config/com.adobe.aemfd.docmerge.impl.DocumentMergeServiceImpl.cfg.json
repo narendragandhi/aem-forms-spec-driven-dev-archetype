@@ -1,0 +1,6 @@
+{
+  "merge.cacheEnabled": true,
+  "merge.maxTemplatesInCache": 100,
+  "merge.defaultOutputFormat": "PDF",
+  "merge.enableDataBinding": true
+}

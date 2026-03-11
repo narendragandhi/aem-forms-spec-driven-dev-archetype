@@ -1,0 +1,38 @@
+# BEAD Issue: TDD for Financial Application Model
+# Agent: Test Writer
+# Parent Task: fin-app-001 (Financial Application Epic)
+
+id: fin-test-001
+type: test
+title: "Define TDD Unit Tests for FinancialApplicationModel"
+status: completed
+priority: high
+created: "2026-03-10T16:00:00Z"
+updated: "2026-03-10T16:00:00Z"
+agent: test-writer
+
+# Traceability
+traces_to:
+  user_story: "US-FIN-001"
+  acceptance_criteria:
+    - "Model accurately represents Customer entity"
+    - "Model accurately represents EmploymentHistory collection"
+    - "Model supports JSON export for FDM consumption"
+
+# Dependencies
+depends_on: []
+blocks: 
+  - fin-app-001 # Blocks final Epic completion
+
+# Acceptance Criteria
+- [x] Unit test created for Customer data mapping (RED)
+- [x] Unit test created for Employment history collection (RED)
+- [x] Model implemented to pass tests (GREEN)
+
+# Technical Details
+### Test Environment
+- Framework: JUnit 5 + AEM Mocks
+- Path: `core/src/test/java/${packageInPathFormat}/core/models/FinancialApplicationModelTest.java`
+
+## Execution Log
+- 2026-03-10: Task created to TDD-ify the core data model for the financial application.

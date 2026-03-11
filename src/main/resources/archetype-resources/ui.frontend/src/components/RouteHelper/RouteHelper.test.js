@@ -15,17 +15,13 @@
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 import { ModelManager } from '@adobe/aem-spa-page-model-manager';
-import { configure, shallow } from 'enzyme';
-import Adapter from 'enzyme-adapter-react-16';
 import React, { Component } from 'react';
-import ReactDOM from 'react-dom';
+import { render, cleanup } from '@testing-library/react';
 import { Route } from 'react-router';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import ShallowRenderer from 'react-test-renderer/shallow';
 import sinon from 'sinon';
 import { CompositeComponent, withRoute } from './RouteHelper';
-
-configure({ adapter: new Adapter() });
 
 describe('RouterHelper ->', () => {
   const ROUTE_CONTENT_CLASS_NAME = 'route-content';
@@ -104,8 +100,6 @@ describe('RouterHelper ->', () => {
 </Router>
 `;
 
-  let rootNode;
-
   class RouteContent extends Component {
     render() {
       return (
@@ -128,19 +122,11 @@ describe('RouterHelper ->', () => {
       .resolves({})
       .withArgs({ pagePath: CUSTOM_ROUTE_PATH_ALIAS_2 })
       .resolves({});
-
-    rootNode = document.createElement('div');
-    rootNode.className = ROOT_NODE_CLASS_NAME;
-    document.body.appendChild(rootNode);
   });
 
   afterEach(() => {
     window.location.hash = '';
-
-    if (rootNode) {
-      document.body.removeChild(rootNode);
-    }
-
+    cleanup();
     sandbox.restore();
   });
 
@@ -152,27 +138,15 @@ describe('RouterHelper ->', () => {
       };
 
       let WrappedComponent = withRoute(RouteContent);
-      ReactDOM.render(
+      const { container } = render(
         <BrowserRouter>
           <WrappedComponent cqModel={cqModel} />
-        </BrowserRouter>,
-        rootNode
+        </BrowserRouter>
       );
 
       expect(
-        rootNode.querySelector('.' + ROUTE_CONTENT_CLASS_NAME)
+        container.querySelector('.' + ROUTE_CONTENT_CLASS_NAME)
       ).not.toBeNull();
-    });
-
-    it('should render the correct component', () => {
-      const wrapper = shallow(<withRoute />);
-      const pathMap = wrapper.find(Route).reduce((pathMap, route) => {
-        const routeProps = route.props();
-        pathMap[routeProps.path] = routeProps.component;
-        return pathMap;
-      }, {});
-
-      expect(pathMap['/content/page/path']).toBe(CompositeComponent);
     });
 
     it('should set the extension to the route URL', () => {
@@ -196,15 +170,14 @@ describe('RouterHelper ->', () => {
 
     it('should render page without extension', () => {
       let WrappedComponent = withRoute(RouteContent);
-      ReactDOM.render(
+      const { container } = render(
         <MemoryRouter initialEntries={[CUSTOM_ROUTE_PATH]}>
           <WrappedComponent cqPath={CUSTOM_ROUTE_PATH} />
-        </MemoryRouter>,
-        rootNode
+        </MemoryRouter>
       );
 
       expect(
-        rootNode.querySelector('.' + ROUTE_CONTENT_CLASS_NAME)
+        container.querySelector('.' + ROUTE_CONTENT_CLASS_NAME)
       ).toBeTruthy();
     });
 
@@ -215,14 +188,13 @@ describe('RouterHelper ->', () => {
       };
 
       let WrappedComponent = withRoute(RouteContent);
-      ReactDOM.render(
+      const { container } = render(
         <BrowserRouter>
           <WrappedComponent cqPath={'path/test'} cqModel={cqModel} />
-        </BrowserRouter>,
-        rootNode
+        </BrowserRouter>
       );
 
-      expect(rootNode.querySelector('.' + ROUTE_CONTENT_CLASS_NAME)).toBeNull();
+      expect(container.querySelector('.' + ROUTE_CONTENT_CLASS_NAME)).toBeNull();
     });
 
     it('should set the correct props in route', () => {

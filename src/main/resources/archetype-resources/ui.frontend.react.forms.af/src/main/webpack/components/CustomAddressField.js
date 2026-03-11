@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { Field } from "@aem-forms/af-react-components";
+import { Field } from "@aemforms/af-react-components";
 
 // A simple, non-functional placeholder for a custom address lookup component.
 // This component demonstrates how a custom React component can be integrated
-// into an AEM Adaptive Form using the @aem-forms/af-react-components library.
+// into an AEM Adaptive Form using the @aemforms/af-react-components library.
 const CustomAddressField = ({
   label,
   description,
@@ -54,7 +54,7 @@ const CustomAddressField = ({
 };
 
 // This wrapper makes the CustomAddressField consumable by the AEM Forms editor.
-// It leverages the 'Field' component from '@aem-forms/af-react-components'
+// It leverages the 'Field' component from '@aemforms/af-react-components'
 // to integrate the custom React component into the Adaptive Form framework.
 export default function (props) {
   // 'Field' handles integration with the AEM Forms rule engine, data binding,

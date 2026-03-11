@@ -1,0 +1,63 @@
+# BEAD Issue: Omnichannel Sign & DoR Pattern
+# Agent: Mayor / Workflow Orchestrator
+# Parent Task: BMAD Sprint 2 - Advanced Integrations
+
+id: omni-sign-001
+type: epic
+title: "Implement Omnichannel Sign & DoR Lifecycle"
+status: pending
+priority: high
+created: "2026-03-10T17:00:00Z"
+updated: "2026-03-10T17:00:00Z"
+agent: workflow-orchestrator
+
+# Traceability
+traces_to:
+  user_story: "US-SIGN-001"
+  specification: "bmad/06-Integrations/omnichannel-sign.md"
+  acceptance_criteria:
+    - "Headless submission triggers AEM Workflow"
+    - "Workflow orchestrates Adobe Sign agreement (mocked)"
+    - "DoR generated post-signing"
+    - "Status tracking available for headless consumer"
+
+# Dependencies
+depends_on: 
+  - hf1a2b3c # Requires Headless Infrastructure
+
+# Sub-tasks
+children:
+  - id: sign-svc-001
+    title: "Implement AdobeSignOrchestrator Mock Service"
+    status: completed
+  - id: sign-wf-001
+    title: "Design Sign-to-DoR Workflow Model"
+    status: completed
+  - id: sign-fe-001
+    title: "Update Headless React App with Status UI"
+    status: completed
+
+# Context (Persistent Memory)
+context:
+  design_decisions:
+    - decision: "Asynchronous status polling for headless clients"
+      reason: "Workflow execution is long-running (human-in-the-loop for signing)"
+      date: "2026-03-10"
+
+    - decision: "Unified Meta-model for DoR and Sign data"
+      reason: "Ensures the exact data submitted headlessly is reflected in the final signed PDF"
+      date: "2026-03-10"
+
+# Artifacts Produced
+  - type: "java-service"
+    path: "core/src/main/java/${packageInPathFormat}/services/AdobeSignOrchestrator.java"
+    status: "committed"
+  - type: "workflow-process"
+    path: "core/src/main/java/${packageInPathFormat}/workflows/SignToDoRProcess.java"
+    status: "committed"
+  - type: "react-ui"
+    path: "ui.frontend.react.forms.af/src/App.js"
+    status: "committed"
+
+# Execution Log
+- 2026-03-10: Epic defined to bridge Headless delivery with core Forms output services.

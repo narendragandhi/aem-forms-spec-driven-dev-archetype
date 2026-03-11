@@ -1,0 +1,32 @@
+{
+  "title": "Card Component",
+  "type": "object",
+  "properties": {
+    "cardTitle": {
+      "type": "string",
+      "title": "Card Title",
+      "description": "The main heading for the card."
+    },
+    "cardText": {
+      "type": "string",
+      "title": "Card Text",
+      "description": "The descriptive body text for the card."
+    },
+    "imagePath": {
+      "type": "string",
+      "title": "Image Path",
+      "description": "The path to the card's image in the DAM."
+    },
+    "buttonText": {
+        "type": "string",
+        "title": "Button Text",
+        "description": "The text for the card's call-to-action button."
+    },
+    "buttonLink": {
+        "type": "string",
+        "title": "Button Link",
+        "description": "The destination URL for the call-to-action button."
+    }
+  },
+  "required": ["cardTitle", "cardText"]
+}

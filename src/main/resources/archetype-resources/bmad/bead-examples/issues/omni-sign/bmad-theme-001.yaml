@@ -1,0 +1,39 @@
+# BEAD Issue: Omnichannel Design System (Theming)
+# Agent: Designer / UI Orchestrator
+# Parent Task: BMAD Sprint 2 - UX Excellence
+
+id: bmad-theme-001
+type: design
+title: "Implement Unified Design Tokens for Omnichannel Forms"
+status: completed
+priority: medium
+created: "2026-03-10T18:00:00Z"
+updated: "2026-03-10T18:00:00Z"
+agent: designer
+
+# Traceability
+traces_to:
+  specification: "bmad/06-Integrations/omnichannel-architecture.md"
+  acceptance_criteria:
+    - "Design tokens defined in CSS Variables"
+    - "Traditional Adaptive Form theme uses variables"
+    - "Headless React app uses same variables"
+
+# Dependencies
+depends_on: 
+  - omni-sign-001 # Visual status indicators rely on theme
+
+# Context (Persistent Memory)
+context:
+  design_decisions:
+    - decision: "Use CSS Variables (:root) as the primary contract between AEM and Headless styling"
+      reason: "Allows for real-time theme updates without rebuilding the React SPA"
+      date: "2026-03-10"
+
+# Artifacts
+  - type: "css-theme"
+    path: "ui.theme.forms/src/main/resources/SLING-INF/etc/clientlibs/fd/af/themes/bmad-financial/css/variables.css"
+    status: "committed"
+
+# Execution Log
+- 2026-03-10: Defined unified tokens to bridge the visual gap between AEM Core Components and Headless React components.

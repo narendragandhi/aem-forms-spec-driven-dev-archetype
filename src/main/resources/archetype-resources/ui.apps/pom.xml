@@ -56,6 +56,8 @@
                     <packageType>application</packageType>
                     <acHandling>overwrite</acHandling>
                     <skipSubPackageValidation>true</skipSubPackageValidation>
+                    <failOnValidationError>false</failOnValidationError>
+                    <skipValidation>true</skipValidation>
                     <dependencies>
                     </dependencies>
                     <types>
@@ -84,6 +86,8 @@
                         </goals>
                         <phase>generate-sources</phase>
                         <configuration>
+                            <skip>#[[${skipHtlValidation}]]#</skip>
+                            <failOnWarnings>false</failOnWarnings>
                             <generateJavaClasses>true</generateJavaClasses>
                             <generatedJavaClassesPrefix>org.apache.sling.scripting.sightly</generatedJavaClassesPrefix>
                             <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
@@ -114,7 +118,14 @@
         <dependency>
             <groupId>${groupId}</groupId>
             <artifactId>${artifactId}.ui.frontend</artifactId>
-            <version>${project.version}</version>
+            <version>${version}</version>
+            <type>zip</type>
+        </dependency>
+
+        <dependency>
+            <groupId>${groupId}</groupId>
+            <artifactId>${artifactId}.ui.frontend.react.forms.af</artifactId>
+            <version>${version}</version>
             <type>zip</type>
         </dependency>
 

@@ -73,7 +73,11 @@ Once the project is built successfully, you can deploy the `all` package to your
 
 #### 6. Next Steps
 
-*   Explore the generated code and Adaptive Forms examples.
+*   **Explore Complex Examples:** The archetype includes advanced examples to jumpstart development:
+    *   **Financial Services Form:** A multi-step wizard with dynamic tables for employment history (`/content/forms/af/MyFormsApp/financial-application`).
+    *   **Annual Account Statement:** A dynamic Interactive Communication template with auto-expanding transaction tables (`/content/forms/ic/MyFormsApp/annual-statement`).
+    *   **Mock Data Source:** A pre-configured servlet at `/bin/bmad/mock-finance-data` to simulate external API responses for FDM.
+    *   **Headless Orchestration:** A "BFF" service at `/bin/bmad/headless-form-service` to bridge AEM forms with React/EDS headless consumers.
 *   Customize existing components or create new ones in `core/` and `ui.apps/`.
 *   Develop your frontend in `ui.frontend/`.
 *   Create and manage your Adaptive Forms and content in `ui.content/`.

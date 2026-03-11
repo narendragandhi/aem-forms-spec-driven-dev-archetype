@@ -1,0 +1,23 @@
+{
+  "title": "Sample Registration Form",
+  "type": "object",
+  "properties": {
+    "firstName": {
+      "type": "string",
+      "title": "First Name",
+      "description": "Enter your first name."
+    },
+    "lastName": {
+      "type": "string",
+      "title": "Last Name",
+      "description": "Enter your last name."
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email Address",
+      "description": "Enter a valid email address."
+    }
+  },
+  "required": ["firstName", "lastName", "email"]
+}

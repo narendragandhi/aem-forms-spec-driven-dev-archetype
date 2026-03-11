@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jcr:root xmlns:jcr="http://www.jcp.org/jcr/1.0" xmlns:dam="http://www.day.com/dam/1.0" xmlns:nt="http://www.jcp.org/jcr/nt/1.0"
+    jcr:primaryType="dam:Asset">
+    <jcr:content
+        jcr:primaryType="dam:AssetContent"
+        jcr:title="Customer Details Fragment">
+        <metadata
+            jcr:primaryType="nt:unstructured"
+            dc:description="Customer information block with name, address, and contact details"
+            dc:title="Customer Details - ${appName}"
+            fragmentType="documentFragment"
+            guideComponentType="fd/af/components/documentfragment"/>
+    </jcr:content>
+</jcr:root>

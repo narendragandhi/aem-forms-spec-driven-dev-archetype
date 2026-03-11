@@ -1,0 +1,95 @@
+# BEAD Issue: Financial Services Application Implementation
+# Agent: Mayor / FDM Architect
+# Parent Task: BMAD Sprint 1 - Core Business Examples
+
+id: fin-app-001
+type: epic
+title: "Develop Financial Services Application Form"
+status: completed
+priority: high
+created: "2026-03-01T09:00:00Z"
+updated: "2026-03-10T15:00:00Z"
+agent: fdm-architect
+
+# Traceability
+traces_to:
+  user_story: "US-FIN-001"
+  specification: "bmad/02-Model-Definition/content-models.md"
+  acceptance_criteria:
+    - "Multi-step wizard layout for data collection"
+    - "Dynamic tables for employment history (1-5 entries)"
+    - "Integration with Mock Finance API for pre-fill"
+    - "Support for both AF (Traditional) and Headless rendering"
+
+# Dependencies
+dependencies: []
+blocks: []
+
+# Sub-tasks
+children:
+  - id: fin-fdm-001
+    title: "Create Finance Data Model (FDM)"
+    status: completed
+  - id: fin-af-001
+    title: "Author Adaptive Form with Wizard Layout"
+    status: completed
+  - id: fin-mock-001
+    title: "Implement MockFinanceDataServlet"
+    status: completed
+  - id: fin-test-001
+    title: "Define TDD Unit Tests for FinancialApplicationModel"
+    status: completed
+
+# Context (Persistent Memory)
+context:
+  design_decisions:
+    - decision: "Use 'Wizard' layout for the root panel"
+      reason: "Reduces cognitive load for complex financial data entry"
+      date: "2026-03-01"
+
+    - decision: "Implement dynamic tables with minOccur=1, maxOccur=5"
+      reason: "Allows flexibility for user employment history while maintaining data integrity"
+      date: "2026-03-02"
+
+    - decision: "BFF-driven pre-fill using MockFinanceDataServlet"
+      reason: "Decouples the form from real banking APIs during the showcase/demo phase"
+      date: "2026-03-05"
+
+  requirements_understood:
+    - "Need to capture personal info and multi-row employment data"
+    - "Form must be responsive and accessible (WCAG 2.1 AA)"
+    - "Data model should support both submission and pre-fill"
+
+  relevant_files:
+    - path: "ui.content/.../financial-application/.content.xml"
+      summary: "JCR definition of the Adaptive Form structure"
+    - path: "core/.../servlets/MockFinanceDataServlet.java"
+      summary: "Provides mock JSON payload for FDM mapping"
+
+# Execution Log
+  - timestamp: "2026-03-01T10:00:00Z"
+    action: "FDM Design"
+    details: "Mapped customer and employmentHistory objects in the data model"
+
+  - timestamp: "2026-03-03T14:00:00Z"
+    action: "Form Authoring"
+    details: "Created the wizard steps and added dynamic table logic"
+
+  - timestamp: "2026-03-10T15:00:00Z"
+    action: "Headless Validation"
+    details: "Verified the form renders correctly in the new ui.frontend.react.forms.af module"
+
+# Artifacts Produced
+  - type: "adaptive-form"
+    path: "ui.content/src/main/content/jcr_root/content/forms/af/${appName}/financial-application"
+    status: "committed"
+
+  - type: "java-servlet"
+    path: "core/src/main/java/${packageInPathFormat}/servlets/MockFinanceDataServlet.java"
+    status: "committed"
+
+# Notes for Next Agent
+handoff_notes: |
+  Financial application example is fully functional. 
+  - To test pre-fill: Use the preview with data option in AEM pointing to /bin/bmad/mock-finance-data.
+  - To extend: Add a 'Credit Check' step in the wizard and integrate with a real or mock credit API.

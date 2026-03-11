@@ -1,0 +1,87 @@
+/* Import BMAD Design Tokens */
+:root {
+  --bmad-primary: #3182ce;
+  --bmad-primary-hover: #2b6cb0;
+  --bmad-secondary: #718096;
+  --bmad-error: #e53e3e;
+  --bmad-success: #38a169;
+  --bmad-bg: #f7fafc;
+  --bmad-surface: #ffffff;
+  --bmad-text: #2d3748;
+  --bmad-text-muted: #718096;
+  --bmad-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bmad-radius: 8px;
+  --bmad-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.headless-form-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  font-family: var(--bmad-font-family);
+  background: var(--bmad-surface);
+  border-radius: var(--bmad-radius);
+  box-shadow: var(--bmad-shadow);
+}
+
+.headless-form-container h1 {
+  color: var(--bmad-text);
+  border-bottom: 2px solid var(--bmad-primary);
+  padding-bottom: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+/* Adaptive Form Core Component Theming */
+.af-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.af-panel {
+  border: 1px solid #e0e0e0;
+  padding: 1.5rem;
+  border-radius: var(--bmad-radius);
+  background: var(--bmad-bg);
+}
+
+/* Omnichannel Status Panel */
+.status-panel {
+  padding: 2rem;
+  border: 2px solid var(--bmad-primary);
+  border-radius: var(--bmad-radius);
+  background: #ebf8ff;
+  text-align: center;
+}
+
+.status-details {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #cbd5e0;
+  color: var(--bmad-text-muted);
+}
+
+.status-badge.RUNNING, .status-badge.OUT_FOR_SIGNATURE {
+  background: #feebc8;
+  color: #9c4221;
+}
+
+.status-badge.SIGNED, .status-badge.GENERATED, .status-badge.COMPLETED {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.success-msg {
+  margin-top: 1.5rem;
+  color: var(--bmad-success);
+  font-weight: 600;
+}

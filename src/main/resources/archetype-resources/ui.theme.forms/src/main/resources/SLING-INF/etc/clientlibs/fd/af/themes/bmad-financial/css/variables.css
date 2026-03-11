@@ -1,0 +1,23 @@
+:root {
+  /* BMAD Design System - Core Tokens */
+  --bmad-primary: #3182ce;
+  --bmad-primary-hover: #2b6cb0;
+  --bmad-secondary: #718096;
+  --bmad-error: #e53e3e;
+  --bmad-success: #38a169;
+  --bmad-bg: #f7fafc;
+  --bmad-surface: #ffffff;
+  --bmad-text: #2d3748;
+  --bmad-text-muted: #718096;
+
+  /* Typography */
+  --bmad-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bmad-radius: 8px;
+  --bmad-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Form Specific */
+  --af-field-spacing: 1.5rem;
+  --af-label-weight: 600;
+  --af-input-border: #cbd5e0;
+  --af-input-focus: #3182ce;
+}

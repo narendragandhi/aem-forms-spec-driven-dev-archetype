@@ -1,65 +1,138 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<archetype-descriptor xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 http://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd"
-    name="aem-forms-bmad-archetype">
-
+<archetype-descriptor xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0 http://maven.apache.org/xsd/archetype-descriptor-1.0.0.xsd" name="aem-forms-bmad-archetype"
+    xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <requiredProperties>
+        <requiredProperty key="includeSpecDrivenExamples">
+            <defaultValue>true</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="includeShowcaseExamples">
+            <defaultValue>true</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="appName">
+            <defaultValue>MyFormsApp</defaultValue>
+        </requiredProperty>
+    </requiredProperties>
     <fileSets>
+        <!-- Filtered text files (POMs, XMLs, Java, JS) -->
+        <fileSet filtered="true">
+            <directory></directory>
+            <includes>
+                <include>**/pom.xml</include>
+                <include>**/*.xml</include>
+            </includes>
+            <excludes>
+                <exclude>ui.frontend/node_modules/**</exclude>
+            </excludes>
+        </fileSet>
         <fileSet filtered="true" packaged="true">
             <directory>core/src/main/java</directory>
             <includes>
                 <include>**/*.java</include>
             </includes>
         </fileSet>
-        <fileSet filtered="true" packaged="true">
-            <directory>it.tests/src/main/java</directory>
+        <fileSet filtered="true">
+            <directory>ui.frontend.react.forms.af/src/main/webpack/components</directory>
             <includes>
-                <include>**/*.java</include>
-            </includes>
-        </fileSet>
-        <fileSet filtered="true" packaged="true">
-            <directory>ui.tests/src/main/java</directory>
-            <includes>
-                <include>**/*.java</include>
+                <include>**/*.js</include>
             </includes>
         </fileSet>
 
-        <!-- New fileSet for Sightly HTML files in ui.apps -->
-        <fileSet filtered="false" encoding="UTF-8">
-            <directory>ui.apps/src/main/content</directory>
+        <!-- Unfiltered files (HTL, CSS, JS, Binary) -->
+        <fileSet filtered="false">
+            <directory>ui.apps</directory>
             <includes>
                 <include>**/*.html</include>
+                <include>**/*.js</include>
+                <include>**/*.css</include>
+                <include>**/*.txt</include>
+                <include>**/*.png</include>
+                <include>**/*.ico</include>
+                <include>**/*.woff</include>
+                <include>**/*.woff2</include>
+                <include>**/*.ttf</include>
+                <include>**/*.otf</include>
+                <include>**/*.eot</include>
             </includes>
         </fileSet>
-
-
-        <!-- Catch-all for everything else, no filtering -->
-        <fileSet filtered="false" encoding="UTF-8">
-            <directory></directory>
+        <fileSet filtered="false">
+            <directory>ui.content</directory>
+            <includes>
+                <include>**/*.png</include>
+                <include>**/*.jpg</include>
+                <include>**/*.jpeg</include>
+                <include>**/*.gif</include>
+                <include>**/*.svg</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="false">
+            <directory>ui.frontend</directory>
+            <includes>
+                <include>**/*</include>
+            </includes>
             <excludes>
-                <!-- Exclude directories that are automatically handled by other fileSets -->
-                <exclude>**/src/main/java/**</exclude>
-                <exclude>**/src/test/java/**</exclude>
-
-                <!-- Exclude html files under ui.apps from the unfiltered set -->
-                <exclude>ui.apps/src/main/content/**/*.html</exclude>
-                <!-- Exclude node_modules and build directories -->
-                <exclude>**/node_modules/**</exclude>
-                <exclude>**/build/**</exclude>
+                <exclude>pom.xml</exclude>
+                <exclude>node_modules/**</exclude>
             </excludes>
         </fileSet>
+        <fileSet filtered="false">
+            <directory>core</directory>
+            <includes>
+                <include>**/bnd.bnd</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="false">
+            <directory>specs</directory>
+            <includes>
+                <include>**/*.json</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="false">
+            <directory>bmad</directory>
+            <includes>
+                <include>**/*.md</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="false">
+            <directory>dispatcher</directory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+            <excludes>
+                <exclude>pom.xml</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet filtered="true">
+            <directory>it.tests</directory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+            <excludes>
+                <exclude>pom.xml</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet filtered="false">
+            <directory>ui.tests</directory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+            <excludes>
+                <exclude>pom.xml</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet filtered="true">
+            <directory>ui.apps.structure</directory>
+            <includes>
+                <include>pom.xml</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true">
+            <directory>ui.apps.structure/src/main/content/META-INF/vault</directory>
+            <includes>
+                <include>filter.xml</include>
+            </includes>
+        </fileSet>
     </fileSets>
-
-    <requiredProperties>
-        <requiredProperty key="groupId"/>
-        <requiredProperty key="artifactId"/>
-        <requiredProperty key="version">
-            <defaultValue>1.0.0-SNAPSHOT</defaultValue>
-        </requiredProperty>
-        <requiredProperty key="package">
-            <defaultValue>${groupId}.${artifactId}</defaultValue>
-        </requiredProperty>
-        <requiredProperty key="appName">
-            <defaultValue>${artifactId}</defaultValue>
-        </requiredProperty>
-    </requiredProperties>
 </archetype-descriptor>

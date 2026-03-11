@@ -1,0 +1,12 @@
+{
+  "pdf.cacheEnabled": true,
+  "pdf.cacheLocation": "/tmp/aemfd/output-cache",
+  "pdf.maxCacheEntries": 1000,
+  "pdf.maxCacheSizeInMB": 500,
+  "pdf.fontDirectories": [
+    "/apps/${appName}/fonts",
+    "/libs/fd/fonts"
+  ],
+  "pdf.enableAcrobatCompatibility": true,
+  "pdf.defaultPdfVersion": "1.7"
+}

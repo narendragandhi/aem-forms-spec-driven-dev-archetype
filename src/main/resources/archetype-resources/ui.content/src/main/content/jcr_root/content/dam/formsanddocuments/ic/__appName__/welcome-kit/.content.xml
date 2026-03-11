@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jcr:root xmlns:jcr="http://www.jcp.org/jcr/1.0" xmlns:dam="http://www.day.com/dam/1.0" xmlns:nt="http://www.jcp.org/jcr/nt/1.0"
+    jcr:primaryType="dam:Asset">
+    <jcr:content
+        jcr:primaryType="dam:AssetContent"
+        jcr:title="Welcome Kit">
+        <metadata
+            jcr:primaryType="nt:unstructured"
+            dc:description="New customer welcome kit with account details and getting started information"
+            dc:title="Welcome Kit - ${appName}"
+            icType="interactiveCommunication"
+            printChannelEnabled="{Boolean}true"
+            webChannelEnabled="{Boolean}true"
+            guideComponentType="fd/af/components/interactivecommunication"/>
+        <print
+            jcr:primaryType="nt:unstructured"
+            jcr:title="Print Channel"/>
+        <web
+            jcr:primaryType="nt:unstructured"
+            jcr:title="Web Channel"
+            responsiveLayout="{Boolean}true"/>
+    </jcr:content>
+</jcr:root>

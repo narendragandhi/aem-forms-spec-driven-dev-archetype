@@ -24,6 +24,7 @@ This phase provides comprehensive documentation for implementing these integrati
 - **[integration-best-practices.md](integration-best-practices.md)**: AEM-specific best practices for error handling, caching, circuit breakers, retry logic, and monitoring integrations.
 
 - **[headless-graphql.md](headless-graphql.md)**: Guide to AEM's headless capabilities including Content Fragments, GraphQL API, and SPA integration patterns.
+- **[headless-forms.md](headless-forms.md)**: Overview of Headless AEM Forms integration using BMAD patterns.
 
 - **[osgi-services.md](osgi-services.md)**: OSGi service patterns for creating reusable, configurable integration services in AEM.
 

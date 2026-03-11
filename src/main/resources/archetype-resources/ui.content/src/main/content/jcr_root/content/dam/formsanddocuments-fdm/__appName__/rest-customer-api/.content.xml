@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jcr:root xmlns:jcr="http://www.jcp.org/jcr/1.0" xmlns:dam="http://www.day.com/dam/1.0" xmlns:nt="http://www.jcp.org/jcr/nt/1.0"
+    jcr:primaryType="dam:Asset">
+    <jcr:content
+        jcr:primaryType="dam:AssetContent"
+        jcr:title="REST Customer API">
+        <metadata
+            jcr:primaryType="nt:unstructured"
+            dc:description="Form Data Model for REST-based customer data API. Configure the endpoint in Cloud Services."
+            dc:title="REST Customer API - ${appName}"
+            fdmType="rest"
+            guideComponentType="fd/af/components/formdatamodel"/>
+        <entities
+            jcr:primaryType="nt:unstructured">
+            <Customer
+                jcr:primaryType="nt:unstructured"
+                jcr:title="Customer"
+                description="Customer entity with profile and account information">
+                <properties
+                    jcr:primaryType="nt:unstructured">
+                    <customerId jcr:primaryType="nt:unstructured" type="string" title="Customer ID"/>
+                    <firstName jcr:primaryType="nt:unstructured" type="string" title="First Name"/>
+                    <lastName jcr:primaryType="nt:unstructured" type="string" title="Last Name"/>
+                    <email jcr:primaryType="nt:unstructured" type="string" title="Email"/>
+                    <phone jcr:primaryType="nt:unstructured" type="string" title="Phone"/>
+                    <address jcr:primaryType="nt:unstructured" type="string" title="Address"/>
+                    <accountBalance jcr:primaryType="nt:unstructured" type="number" title="Account Balance"/>
+                </properties>
+            </Customer>
+            <Transaction
+                jcr:primaryType="nt:unstructured"
+                jcr:title="Transaction"
+                description="Financial transaction record">
+                <properties
+                    jcr:primaryType="nt:unstructured">
+                    <transactionId jcr:primaryType="nt:unstructured" type="string" title="Transaction ID"/>
+                    <date jcr:primaryType="nt:unstructured" type="date" title="Date"/>
+                    <description jcr:primaryType="nt:unstructured" type="string" title="Description"/>
+                    <amount jcr:primaryType="nt:unstructured" type="number" title="Amount"/>
+                    <type jcr:primaryType="nt:unstructured" type="string" title="Type"/>
+                </properties>
+            </Transaction>
+        </entities>
+        <services
+            jcr:primaryType="nt:unstructured">
+            <getCustomer jcr:primaryType="nt:unstructured" method="GET" path="/customers/{customerId}" title="Get Customer"/>
+            <getTransactions jcr:primaryType="nt:unstructured" method="GET" path="/customers/{customerId}/transactions" title="Get Transactions"/>
+        </services>
+    </jcr:content>
+</jcr:root>
