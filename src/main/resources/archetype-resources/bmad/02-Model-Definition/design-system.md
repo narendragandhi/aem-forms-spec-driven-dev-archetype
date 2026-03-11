@@ -245,3 +245,22 @@ Design token updates should be tracked with semantic versioning:
 - **Major**: Breaking changes to existing tokens
 - **Minor**: New tokens added
 - **Patch**: Bug fixes or adjustments to token values
+
+## Omnichannel Token Sync
+
+To ensure visual consistency across AEM-rendered forms and Headless React SPAs, this project employs a **Unified Token Contract** using CSS Variables (`--bmad-`).
+
+### The Sync Mechanism
+1. **AEM Theme (Source of Truth)**: Tokens are defined in `ui.theme.forms` within `variables.css`.
+2. **Headless SPA (Consumer)**: The React application in `ui.frontend.react.forms.af` mirrors these tokens in its local `App.css`.
+3. **Runtime Override**: When the Headless app is embedded or integrated, it can dynamically ingest tokens from the AEM ClientLib, ensuring that a brand change in AEM instantly reflects in the SPA.
+
+### Token Naming Convention
+All tokens MUST follow the `--bmad-{category}-{property}` pattern:
+- `--bmad-color-primary`
+- `--bmad-type-font-family`
+- `--bmad-space-margin-md`
+
+### Enforcement Rules
+- **No Hardcoded Values**: Any UI code (Java, HTL, or React) containing hex codes, RGB, or hardcoded pixel values for theme-related properties will be rejected during Code Review.
+- **Token-Only Styling**: All styling must reference a `--bmad-` variable or a standard design system utility class.
