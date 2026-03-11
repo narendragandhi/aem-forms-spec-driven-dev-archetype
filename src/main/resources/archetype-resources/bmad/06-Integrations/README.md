@@ -25,6 +25,7 @@ This phase provides comprehensive documentation for implementing these integrati
 
 - **[headless-graphql.md](headless-graphql.md)**: Guide to AEM's headless capabilities including Content Fragments, GraphQL API, and SPA integration patterns.
 - **[headless-forms.md](headless-forms.md)**: Overview of Headless AEM Forms integration using BMAD patterns.
+- **[enterprise-hardening-guide.md](enterprise-hardening-guide.md)**: "Elite" enterprise patterns for AEM Forms: Legacy Modernization (AFCS), Document Automation (IC), FDM Data Orchestration, and Document Rights Management (DRM).
 
 - **[osgi-services.md](osgi-services.md)**: OSGi service patterns for creating reusable, configurable integration services in AEM.
 
