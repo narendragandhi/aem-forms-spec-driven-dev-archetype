@@ -16,12 +16,14 @@
 
 .headless-form-container {
   max-width: 800px;
+  width: 95%;
   margin: 2rem auto;
   padding: 2rem;
   font-family: var(--bmad-font-family);
   background: var(--bmad-surface);
   border-radius: var(--bmad-radius);
   box-shadow: var(--bmad-shadow);
+  box-sizing: border-box;
 }
 
 .headless-form-container h1 {
@@ -29,6 +31,7 @@
   border-bottom: 2px solid var(--bmad-primary);
   padding-bottom: 0.5rem;
   margin-bottom: 2rem;
+  font-size: 1.75rem;
 }
 
 /* Adaptive Form Core Component Theming */
@@ -57,17 +60,60 @@
 .status-details {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-top: 1.5rem;
 }
 
 .status-badge {
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.2rem;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 600;
   background: #cbd5e0;
   color: var(--bmad-text-muted);
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Mobile Optimizations */
+@media screen and (max-width: 600px) {
+  .headless-form-container {
+    margin: 1rem auto;
+    padding: 1.25rem;
+    border-radius: 0;
+    box-shadow: none;
+    border-top: 4px solid var(--bmad-primary);
+  }
+
+  .headless-form-container h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .af-panel {
+    padding: 1rem;
+  }
+
+  .status-panel {
+    padding: 1.5rem 1rem;
+  }
+
+  .status-details {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .status-badge {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .success-msg {
+    font-size: 0.9rem;
+  }
 }
 
 .status-badge.RUNNING, .status-badge.OUT_FOR_SIGNATURE {
