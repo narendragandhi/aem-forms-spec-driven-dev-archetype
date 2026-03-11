@@ -64,6 +64,38 @@ Business Requirement → User Story → Technical Spec → Implementation → Te
 
 ---
 
+## Elite AEM Forms Traceability (Omnichannel & Headless)
+
+| Artifact Type | ID | Description | Traces To |
+|--------------|-----|-------------|-----------|
+| **Requirement** | REQ-FORMS-001 | Omnichannel Headless Form Delivery & Status | US-FORMS-001 |
+| **Requirement** | REQ-FORMS-002 | Asynchronous E-Sign & DoR Workflow | US-FORMS-002 |
+| **Requirement** | REQ-FORMS-003 | Enterprise Hardening (DRM, FDM, AFCS) | US-FORMS-003 |
+| **User Story** | US-FORMS-001 | As a developer, I want to deliver forms headlessly via React | SPEC-FORMS-001 |
+| **User Story** | US-FORMS-002 | As a user, I want to sign my application and receive a DoR | SPEC-FORMS-002 |
+| **User Story** | US-FORMS-003 | As an architect, I want a hardened enterprise form foundation | SPEC-FORMS-003 |
+| **Specification** | SPEC-FORMS-001 | `headless-forms.md` | CODE-FORMS-BFF-* |
+| **Specification** | SPEC-FORMS-002 | `omnichannel-architecture.md` | CODE-FORMS-WF-* |
+| **Specification** | SPEC-FORMS-003 | `enterprise-hardening-guide.md` | CODE-FORMS-SEC-* |
+| **Code - BFF** | CODE-FORMS-001 | `HeadlessFormService.java` | TEST-FORMS-001 |
+| **Code - React** | CODE-FORMS-002 | `App.js` (Headless React Consumer) | TEST-FORMS-002 |
+| **Code - Workflow**| CODE-FORMS-003 | `SignToDoRProcess.java` | TEST-FORMS-003 |
+| **Test - E2E** | TEST-FORMS-002 | `omnichannel-flow.cy.js` (Cypress) | US-FORMS-001 AC |
+| **Test - Unit** | TEST-FORMS-003 | `FinancialApplicationModelTest.java` | US-FORMS-002 AC |
+
+### Detailed Mappings (Elite Forms)
+
+| AC ID | Acceptance Criteria | Implementation | Test |
+|-------|--------------------|--------------------|------|
+| US-FORMS-001.AC1 | Form model fetched via BFF endpoint | `HeadlessFormService.java` | Cypress Intercept Test |
+| US-FORMS-001.AC2 | React app renders AF components | `@aemforms/af-react-renderer` | `App.js` snapshot |
+| US-FORMS-002.AC1 | Submission triggers Sign workflow | `HeadlessSubmitServlet.java` | Workflow instance check |
+| US-FORMS-002.AC2 | Live status polling in UI | `useEffect` + `/bin/bmad/headless-status` | Cypress status loop |
+| US-FORMS-003.AC1 | Unified Design Tokens applied | `variables.css` + `App.css` | Visual regression |
+| US-FORMS-003.AC2 | DRM Security Policy applied to PDF | `enterprise-hardening-guide.md` | Manual PDF audit |
+
+---
+
 ## File Location Reference
 
 ### Specifications (SPEC)
