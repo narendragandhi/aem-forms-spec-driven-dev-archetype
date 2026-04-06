@@ -1,4 +1,4 @@
-# Beads CLI Setup Guide - ${appName}
+# Beads CLI Setup Guide
 
 This guide covers how to install and use the Beads (`bd`) CLI for AI agent task tracking in your AEM Forms project.
 
