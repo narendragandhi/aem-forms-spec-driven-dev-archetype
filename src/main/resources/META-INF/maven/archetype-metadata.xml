@@ -3,6 +3,10 @@
     xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <requiredProperties>
+        <requiredProperty key="formsVersion">
+            <defaultValue>afaacs</defaultValue>
+            <validationRegex>afaacs|6\.5</validationRegex>
+        </requiredProperty>
         <requiredProperty key="includeSpecDrivenExamples">
             <defaultValue>true</defaultValue>
             <validationRegex>true|false</validationRegex>

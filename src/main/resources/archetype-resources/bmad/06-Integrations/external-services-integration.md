@@ -4,11 +4,319 @@ This document provides patterns and examples for integrating AEM with external e
 
 ## Table of Contents
 
-1. [CRM Integration (Salesforce)](#crm-integration-salesforce)
-2. [Adobe Analytics Integration](#adobe-analytics-integration)
-3. [Translation Service Integration](#translation-service-integration)
-4. [Commerce Integration](#commerce-integration)
-5. [Email Service Integration](#email-service-integration)
+1. [Form Data Model (FDM)](#form-data-model-fdm)
+2. [GraphQL FDM](#graphql-fdm)
+3. [OData FDM](#odata-fdm)
+4. [Edge Delivery Services](#edge-delivery-services)
+5. [CRM Integration (Salesforce)](#crm-integration-salesforce)
+6. [Adobe Analytics Integration](#adobe-analytics-integration)
+7. [Translation Service Integration](#translation-service-integration)
+8. [Commerce Integration](#commerce-integration)
+9. [Email Service Integration](#email-service-integration)
+
+---
+
+## Form Data Model (FDM)
+
+### Overview
+
+Form Data Models (FDM) are the backbone of data integration in AEM Forms, providing:
+- Data source abstraction
+- Pre-fill capabilities
+- Submission handling
+- Service orchestration
+
+### Creating an FDM
+
+```bash
+# FDM location
+/conf/{appName}/settings/fdm/
+```
+
+### FDM Structure
+
+```xml
+<!-- /conf/app/settings/fdm/customer-fdm/.content.xml -->
+<jcr:root xmlns:jcr="http://jcp.org/jcr/1.0"
+    jcr:primaryType="fdm:formdatamodel"
+    jcr:title="Customer Data FDM"
+    fdm:description="FDM for customer data operations"
+    fdm:schemaVersion="1.0">
+    
+    <dataSources jcr:primaryType="nt:unstructured">
+        <rest-service
+            fdm:type="rest"
+            fdm:serviceReference="/conf/global/settings/cloudconfigs/fdm/rest-customer"/>
+    </dataSources>
+    
+    <entities jcr:primaryType="nt:unstructured">
+        <customer
+            jcr:primaryType="fdm:entity"
+            fdm:label="Customer"
+            fdm:url="customer/{id}">
+            <firstName fdm:dataType="string"/>
+            <lastName fdm:dataType="string"/>
+            <email fdm:dataType="string"/>
+            <phone fdm:dataType="string"/>
+        </customer>
+    </entities>
+</jcr:root>
+```
+
+---
+
+## GraphQL FDM
+
+### When to Use GraphQL
+
+- Complex data queries with nested relationships
+- Mobile applications requiring efficient data loading
+- Headless Adaptive Forms with React/Vue/Angular
+- AFaaCS (Adaptive Forms as a Cloud Service)
+
+### GraphQL FDM Configuration
+
+```xml
+<!-- /conf/app/settings/fdm/graphql-customer-fdm/.content.xml -->
+<jcr:root xmlns:jcr="http://jcp.org/jcr/1.0"
+    jcr:primaryType="fdm:formdatamodel"
+    jcr:title="GraphQL Customer FDM"
+    fdm:description="FDM using GraphQL for customer data"
+    fdm:schemaVersion="2.0">
+    
+    <dataSources jcr:primaryType="nt:unstructured">
+        <graphql-ds
+            fdm:type="graphql"
+            fdm:serviceReference="/conf/global/settings/cloudconfigs/fdm/graphql-customer"
+            fdm:graphiqlEnabled="true"/>
+    </dataSources>
+    
+    <entities jcr:primaryType="nt:unstructured">
+        <customerList
+            fdm:label="Customers"
+            fdm:query="query GetCustomers($limit: Int, $offset: Int) { customers(limit: $limit, offset: $offset) { id firstName lastName email } }">
+            <id fdm:dataType="string"/>
+            <firstName fdm:dataType="string"/>
+            <lastName fdm:dataType="string"/>
+            <email fdm:dataType="string"/>
+        </customerList>
+        
+        <customerDetail
+            fdm:label="Customer Detail"
+            fdm:query="query GetCustomer($id: ID!) { customer(id: $id) { id firstName lastName email address { street city state zip } orders { id total status } } }">
+            <id fdm:dataType="string"/>
+            <firstName fdm:dataType="string"/>
+            <lastName fdm:dataType="string"/>
+            <email fdm:dataType="string"/>
+            <address fdm:dataType="object">
+                <street fdm:dataType="string"/>
+                <city fdm:dataType="string"/>
+                <state fdm:dataType="string"/>
+                <zip fdm:dataType="string"/>
+            </address>
+            <orders fdm:dataType="array">
+                <id fdm:dataType="string"/>
+                <total fdm:dataType="number"/>
+                <status fdm:dataType="string"/>
+            </orders>
+        </customerDetail>
+    </entities>
+</jcr:root>
+```
+
+### GraphQL Schema Example
+
+```graphql
+# schema.graphqls
+type Customer {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    email: String!
+    phone: String
+    address: Address
+    orders: [Order]
+}
+
+type Address {
+    street: String!
+    city: String!
+    state: String!
+    zip: String!
+}
+
+type Order {
+    id: ID!
+    total: Float!
+    status: OrderStatus!
+    items: [OrderItem]
+}
+
+enum OrderStatus {
+    PENDING
+    PROCESSING
+    SHIPPED
+    DELIVERED
+    CANCELLED
+}
+
+type Query {
+    customers(limit: Int, offset: Int): [Customer]
+    customer(id: ID!): Customer
+}
+
+type Mutation {
+    createCustomer(input: CustomerInput!): Customer
+    updateCustomer(id: ID!, input: CustomerInput!): Customer
+    deleteCustomer(id: ID!): Boolean
+}
+```
+
+### Headless Form Integration
+
+```javascript
+// React component using GraphQL FDM
+import { useAdaptiveForm } from '@adobe/aem-forms-af-react';
+
+const CustomerList = () => {
+    const { data, submit } = useAdaptiveForm({
+        fdm: '/conf/app/settings/fdm/graphql-customer-fdm',
+        entity: 'customerList'
+    });
+    
+    // GraphQL queries are handled automatically by the FDM
+    return (
+        <Form>
+            <FieldArray name="customers">
+                {data?.customers?.map(customer => (
+                    <div key={customer.id}>
+                        {customer.firstName} {customer.lastName}
+                    </div>
+                ))}
+            </FieldArray>
+        </Form>
+    );
+};
+```
+
+---
+
+## OData FDM
+
+### When to Use OData
+
+- Microsoft ecosystem integration (Dynamics, SharePoint)
+- Standardized REST API with query options
+- Enterprise APIs following OData protocol
+- $select, $filter, $expand queries
+
+### OData FDM Configuration
+
+```xml
+<!-- /conf/app/settings/fdm/odata-customer-fdm/.content.xml -->
+<jcr:root xmlns:jcr="http://jcp.org/jcr/1.0"
+    jcr:primaryType="fdm:formdatamodel"
+    jcr:title="OData Customer FDM"
+    fdm:description="FDM using OData for Microsoft integration"
+    fdm:schemaVersion="2.0">
+    
+    <dataSources jcr:primaryType="nt:unstructured">
+        <odata-ds
+            fdm:type="odata"
+            fdm:serviceReference="/conf/global/settings/cloudconfigs/fdm/odata-microsoft"
+            fdm:authenticationType="oauth2"/>
+    </dataSources>
+    
+    <entities jcr:primaryType="nt:unstructured">
+        <customerEntity
+            fdm:label="Customer"
+            fdm:url="Customers"
+            fdm:queryTemplate="$select=FirstName,LastName,Email&$filter=Active eq true">
+            <ID fdm:dataType="string" fdm:key="true"/>
+            <FirstName fdm:dataType="string"/>
+            <LastName fdm:dataType="string"/>
+            <Email fdm:dataType="string"/>
+            <Company fdm:dataType="string"/>
+        </customerEntity>
+        
+        <orderEntity
+            fdm:label="Orders"
+            fdm:url="Orders"
+            fdm:queryTemplate="$expand=Customer&$orderby=OrderDate desc">
+            <ID fdm:dataType="string" fdm:key="true"/>
+            <CustomerID fdm:dataType="string"/>
+            <OrderDate fdm:dataType="date"/>
+            <Total fdm:dataType="number"/>
+            <Status fdm:dataType="string"/>
+        </orderEntity>
+    </entities>
+</jcr:root>
+```
+
+### OData Query Examples
+
+| OData Query | Description |
+|------------|-------------|
+| `$select=FirstName,LastName` | Select specific fields |
+| `$filter=Active eq true` | Filter records |
+| `$orderby=LastName` | Sort results |
+| `$expand=Orders` | Include related data |
+| `$top=10` | Limit results |
+| `$skip=20` | Paginate results |
+
+---
+
+## Edge Delivery Services
+
+### When to Use Edge Delivery
+
+- High-performance form rendering
+- Microsoft Word/Google Docs authoring
+- Franklin (block-based editor)
+- Universal Editor integration
+
+### Edge Delivery FDM
+
+```xml
+<!-- /conf/app/settings/fdm/edge-delivery-fdm/.content.xml -->
+<jcr:root xmlns:jcr="http://jcp.org/jcr/1.0"
+    jcr:primaryType="fdm:formdatamodel"
+    jcr:title="Edge Delivery FDM"
+    fdm:description="FDM for Edge Delivery Services"
+    fdm:schemaVersion="2.0">
+    
+    <dataSources jcr:primaryType="nt:unstructured">
+        <edge-ds
+            fdm:type="rest"
+            fdm:serviceReference="/conf/global/settings/cloudconfigs/fdm/edge-delivery"
+            fdm:useAemProxy="true"/>
+    </dataSources>
+    
+    <entities jcr:primaryType="nt:unstructured">
+        <formSubmission
+            fdm:label="Form Submission"
+            fdm:postUrl="/{formPath}/submit">
+            <formPath fdm:dataType="string"/>
+            <data fdm:dataType="object"/>
+            <metadata fdm:dataType="object"/>
+        </formSubmission>
+    </entities>
+</jcr:root>
+```
+
+### Microsoft Word Authoring
+
+Forms can be authored in Microsoft Word and published to Edge Delivery Services:
+
+```bash
+# SharePoint document library
+# /sites/forms/loan-application.docx
+```
+
+Word document structure:
+- Form fields become form controls
+- Sections become form panels
+- Validation rules are embedded
 
 ---
 

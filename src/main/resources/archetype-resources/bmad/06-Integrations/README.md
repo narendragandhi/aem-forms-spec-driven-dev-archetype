@@ -27,6 +27,8 @@ This phase provides comprehensive documentation for implementing these integrati
 - **[headless-forms.md](headless-forms.md)**: Overview of Headless AEM Forms integration using BMAD patterns.
 - **[enterprise-hardening-guide.md](enterprise-hardening-guide.md)**: "Elite" enterprise patterns for AEM Forms: Legacy Modernization (AFCS), Document Automation (IC), FDM Data Orchestration, and Document Rights Management (DRM).
 
+- **[security-hardening.md](security-hardening.md)**: Security best practices including CSRF protection, CAPTCHA integration, XSS prevention, and form submission security.
+
 - **[osgi-services.md](osgi-services.md)**: OSGi service patterns for creating reusable, configurable integration services in AEM.
 
 - **[ai-services.md](ai-services.md)**: Multi-provider LLM service integration (OpenAI, Claude, Gemini) with unified abstraction layer for AI-powered content features.

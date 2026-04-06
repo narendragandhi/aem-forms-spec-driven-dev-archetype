@@ -173,6 +173,8 @@ Document pdf = icService.generate(
 
 > See `bmad/06-Integrations/interactive-communications-guide.md` for full documentation.
 
+> See `bmad/00-Project-Initialization/forms-version-compatibility.md` for AFaaCS vs 6.5 guidance.
+
 ## Configuration Options
 
 | Property | Default | Description |
@@ -181,6 +183,7 @@ Document pdf = icService.generate(
 | `artifactId` | - | Maven artifact ID |
 | `appName` | - | Application name (used in paths) |
 | `aemVersion` | `cloud` | AEM version (`cloud`, `6.5`) |
+| `formsVersion` | `afaacs` | Forms version (`afaacs`, `6.5`) |
 | `includeSpecDrivenExamples` | `true` | Include spec-driven form examples |
 | `includeShowcaseExamples` | `true` | Include showcase components |
 
