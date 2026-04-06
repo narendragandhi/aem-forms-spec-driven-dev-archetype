@@ -57,7 +57,16 @@ gastown/
 │   └── content-migration.yaml
 ├── bead/                        # BEAD issue tracking
 │   ├── .issues/                 # Git-backed issue store
-│   └── README.md                # BEAD usage guide
+│   ├── README.md                # BEAD overview
+│   ├── BEADS-SETUP.md           # Beads CLI setup guide
+│   ├── ID-FORMAT.md             # Issue ID format migration
+│   └── templates/               # Issue templates
+├── CONVOY.md                    # Convoy system for work tracking
+├── MOLECULES.md                 # Molecules & Formulas for workflow templates
+├── MONITORING.md               # Monitoring tier (Witness/Deacon/Dogs)
+├── SEANCE.md                   # Session discovery & continuation
+├── TELEMETRY.md                # OpenTelemetry observability
+├── DASHBOARD.md                # Web dashboard for workspace monitoring
 ├── config/                      # GasTown configuration
 │   └── gastown.yaml             # Main configuration
 └── scripts/                     # Helper scripts
