@@ -29,6 +29,7 @@
             </includes>
             <excludes>
                 <exclude>ui.frontend/node_modules/**</exclude>
+                <exclude>ui.frontend.react.forms.af/node_modules/**</exclude>
             </excludes>
         </fileSet>
         <fileSet filtered="true" packaged="true">
@@ -37,11 +38,23 @@
                 <include>**/*.java</include>
             </includes>
         </fileSet>
-        <fileSet filtered="true">
-            <directory>ui.frontend.react.forms.af/src/main/webpack/components</directory>
+        <fileSet filtered="true" packaged="true">
+            <directory>core/src/test/java</directory>
             <includes>
-                <include>**/*.js</include>
+                <include>**/*.java</include>
             </includes>
+        </fileSet>
+        <!-- ui.frontend.react.forms.af: all non-pom files (package.json, src/, public/, cypress/) -->
+        <fileSet filtered="false">
+            <directory>ui.frontend.react.forms.af</directory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+            <excludes>
+                <exclude>pom.xml</exclude>
+                <exclude>node_modules/**</exclude>
+                <exclude>**/node_modules/**</exclude>
+            </excludes>
         </fileSet>
 
         <!-- Unfiltered files (HTL, CSS, JS, Binary) -->
@@ -97,6 +110,23 @@
             <directory>bmad</directory>
             <includes>
                 <include>**/*.md</include>
+                <include>**/*.yaml</include>
+                <include>**/*.yml</include>
+                <include>**/*.json</include>
+                <include>**/*.toml</include>
+                <include>**/.gitkeep</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="false" encoding="UTF-8">
+            <directory>bmad/gastown/scripts</directory>
+            <includes>
+                <include>**/*.sh</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="false">
+            <directory></directory>
+            <includes>
+                <include>AGENTS.md</include>
             </includes>
         </fileSet>
         <fileSet filtered="false">

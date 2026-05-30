@@ -27,7 +27,7 @@ import uk.org.lidalia.slf4jtest.LoggingEvent;
 import uk.org.lidalia.slf4jtest.TestLogger;
 import uk.org.lidalia.slf4jtest.TestLoggerFactory;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -57,5 +57,55 @@ class SimpleScheduledTaskTest {
         assertEquals(Level.DEBUG, event.getLevel());
         assertEquals(1, event.getArguments().size());
         assertEquals("parameter value", event.getArguments().get(0));
+    }
+
+    @Test
+    void runWithEmptyParameter() {
+        SimpleScheduledTask.Config config = mock(SimpleScheduledTask.Config.class);
+        when(config.myParameter()).thenReturn("");
+
+        fixture.activate(config);
+        fixture.run();
+
+        List<LoggingEvent> events = logger.getLoggingEvents();
+        assertEquals(1, events.size());
+        assertEquals("", events.get(0).getArguments().get(0));
+    }
+
+    @Test
+    void runWithNullParameter() {
+        SimpleScheduledTask.Config config = mock(SimpleScheduledTask.Config.class);
+        when(config.myParameter()).thenReturn(null);
+
+        fixture.activate(config);
+        fixture.run();
+
+        List<LoggingEvent> events = logger.getLoggingEvents();
+        assertEquals(1, events.size());
+        assertNull(events.get(0).getArguments().get(0));
+    }
+
+    @Test
+    void runWithoutActivateDoesNotThrow() {
+        assertDoesNotThrow(() -> fixture.run());
+    }
+
+    @Test
+    void activateUpdatesParameterForSubsequentRuns() {
+        SimpleScheduledTask.Config config1 = mock(SimpleScheduledTask.Config.class);
+        when(config1.myParameter()).thenReturn("first");
+        fixture.activate(config1);
+        fixture.run();
+
+        TestLoggerFactory.clear();
+
+        SimpleScheduledTask.Config config2 = mock(SimpleScheduledTask.Config.class);
+        when(config2.myParameter()).thenReturn("second");
+        fixture.activate(config2);
+        fixture.run();
+
+        List<LoggingEvent> events = logger.getLoggingEvents();
+        assertEquals(1, events.size());
+        assertEquals("second", events.get(0).getArguments().get(0));
     }
 }

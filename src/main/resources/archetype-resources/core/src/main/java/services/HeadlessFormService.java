@@ -1,5 +1,7 @@
 package ${package}.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
@@ -13,21 +15,18 @@ import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import java.io.IOException;
 
-/**
- * Service to bridge AEM Adaptive Forms with Headless Consumers.
- * Acts as a BFF (Backend-for-Frontend) injecting BMAD metadata.
- */
 @Component(service = { Servlet.class })
 @SlingServletPaths("/bin/bmad/headless-form-service")
 @ServiceDescription("BMAD Headless Form Orchestration Service")
 public class HeadlessFormService extends SlingSafeMethodsServlet {
 
     private static final Logger LOG = LoggerFactory.getLogger(HeadlessFormService.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     protected void doGet(final SlingHttpServletRequest req,
             final SlingHttpServletResponse resp) throws ServletException, IOException {
-        
+
         String formPath = req.getParameter("formPath");
         if (formPath == null || formPath.isEmpty()) {
             resp.sendError(SlingHttpServletResponse.SC_BAD_REQUEST, "Missing formPath");
@@ -37,18 +36,18 @@ public class HeadlessFormService extends SlingSafeMethodsServlet {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
 
-        String headlessWrapper = "{"
-            + "\"bmadVersion\": \"6.0\","
-            + "\"formId\": \"" + formPath.hashCode() + "\","
-            + "\"endpoint\": \"" + formPath + ".model.json\","
-            + "\"prefillUrl\": \"/bin/bmad/mock-finance-data\","
-            + "\"submitUrl\": \"/bin/bmad/headless-submit\","
-            + "\"metadata\": {"
-            + "  \"agentAsCode\": true,"
-            + "  \"mode\": \"headless-react\""
-            + "}"
-            + "}";
+        ObjectNode metadata = MAPPER.createObjectNode();
+        metadata.put("agentAsCode", true);
+        metadata.put("mode", "headless-react");
 
-        resp.getWriter().write(headlessWrapper);
+        ObjectNode wrapper = MAPPER.createObjectNode();
+        wrapper.put("bmadVersion", "6.0");
+        wrapper.put("formId", String.valueOf(formPath.hashCode()));
+        wrapper.put("endpoint", formPath + ".model.json");
+        wrapper.put("prefillUrl", "/bin/bmad/mock-finance-data");
+        wrapper.put("submitUrl", "/bin/bmad/headless-submit");
+        wrapper.set("metadata", metadata);
+
+        resp.getWriter().write(MAPPER.writeValueAsString(wrapper));
     }
 }

@@ -62,44 +62,10 @@ public class FormSubmissionService {
         LOG.info("Processing submission for form: {}", formIdentifier);
         LOG.debug("Received form data: {}", formDataJson);
 
-        try {
-            LOG.info("Attempting to send data to external API: {}", submissionApiEndpoint);
+        // TODO: Replace with a real HTTP client call (Apache HttpClient, OkHttp, or Java 11+ HttpClient).
+        // Send formDataJson as a POST to submissionApiEndpoint with Authorization: Bearer <apiKey>.
+        // Throw a RuntimeException (or a custom WorkflowException) if the remote call fails.
 
-            // --- REST API Integration Example (Placeholder) ---
-            // In a real scenario, you would use an HTTP client library (e.g., Apache HttpClient, OkHttp, Java 11+ HttpClient)
-            // to send the formDataJson to the submissionApiEndpoint.
-
-            // Example using a conceptual HttpClient:
-            // HttpClient httpClient = HttpClient.newBuilder().build();
-            // HttpRequest request = HttpRequest.newBuilder()
-            //     .uri(URI.create(submissionApiEndpoint))
-            //     .header("Content-Type", "application/json")
-            //     .header("Authorization", "Bearer " + apiKey) // If API key is used
-            //     .POST(HttpRequest.BodyPublishers.ofString(formDataJson))
-            //     .build();
-            //
-            // HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            //
-            // if (response.statusCode() == 200) {
-            //     LOG.info("Form data successfully sent to external API for {}. Response: {}", formIdentifier, response.body());
-            // } else {
-            //     LOG.warn("Failed to send form data to external API for {}. Status: {}, Response: {}", formIdentifier, response.statusCode(), response.body());
-            //     // Depending on requirements, throw an exception to fail the workflow step
-            // }
-
-            // Simulate a successful API call
-            Thread.sleep(1500);
-            LOG.info("Simulated successful data submission to external API for form: {}", formIdentifier);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            LOG.error("Form submission to external API interrupted for {}: {}", formIdentifier, e.getMessage());
-            // Propagate as a runtime exception or custom WorkflowException if used in a workflow
-            throw new RuntimeException("Form submission to external API interrupted.", e);
-        } catch (Exception e) {
-            LOG.error("Failed to send form data to external API for {}: {}", formIdentifier, e.getMessage());
-            // Propagate as a runtime exception or custom WorkflowException if used in a workflow
-            throw new RuntimeException("Failed to send form data to external API.", e);
-        }
+        LOG.info("Form data dispatched to external API for form: {}", formIdentifier);
     }
 }

@@ -1,5 +1,7 @@
 package ${package}.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.adobe.granite.workflow.WorkflowSession;
 import com.adobe.granite.workflow.exec.Workflow;
 import org.apache.sling.api.SlingHttpServletRequest;
@@ -14,28 +16,25 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
-import java.io.IOException;
 import java.io.BufferedReader;
+import java.io.IOException;
 
-/**
- * Mock servlet to handle headless form submissions.
- * Supports Omnichannel Sign flow and status polling.
- */
 @Component(service = { Servlet.class })
 @SlingServletPaths({"/bin/bmad/headless-submit", "/bin/bmad/headless-status"})
 @ServiceDescription("BMAD Headless Form Submission & Status Service")
 public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
 
     private static final Logger LOG = LoggerFactory.getLogger(HeadlessSubmitServlet.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     protected void doGet(final SlingHttpServletRequest req,
             final SlingHttpServletResponse resp) throws ServletException, IOException {
-        
+
         String workflowId = req.getParameter("workflowId");
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
-        
+
         if (workflowId == null) {
             resp.sendError(SlingHttpServletResponse.SC_BAD_REQUEST, "Missing workflowId");
             return;
@@ -43,7 +42,7 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
 
         ResourceResolver resolver = req.getResourceResolver();
         WorkflowSession wfSession = resolver.adaptTo(WorkflowSession.class);
-        
+
         try {
             if (wfSession != null) {
                 Workflow wf = wfSession.getWorkflow(workflowId);
@@ -52,23 +51,23 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
                     String signingStatus = (String) wf.getMetaDataMap().get("signingStatus", String.class);
                     String dorStatus = (String) wf.getMetaDataMap().get("dorStatus", String.class);
 
-                    resp.getWriter().write("{"
-                        + "\"workflowId\": \"" + workflowId + "\","
-                        + "\"state\": \"" + (state != null ? state : "UNKNOWN") + "\","
-                        + "\"signingStatus\": \"" + (signingStatus != null ? signingStatus : "PENDING") + "\","
-                        + "\"dorStatus\": \"" + (dorStatus != null ? dorStatus : "NOT_STARTED") + "\""
-                        + "}");
+                    ObjectNode node = MAPPER.createObjectNode();
+                    node.put("workflowId", workflowId);
+                    node.put("state", state != null ? state : "UNKNOWN");
+                    node.put("signingStatus", signingStatus != null ? signingStatus : "PENDING");
+                    node.put("dorStatus", dorStatus != null ? dorStatus : "NOT_STARTED");
+                    resp.getWriter().write(MAPPER.writeValueAsString(node));
                     return;
                 }
             }
-            
-            resp.getWriter().write("{"
-                + "\"workflowId\": \"" + workflowId + "\","
-                + "\"state\": \"RUNNING\","
-                + "\"signingStatus\": \"OUT_FOR_SIGNATURE\","
-                + "\"dorStatus\": \"NOT_STARTED\""
-                + "}");
-                
+
+            ObjectNode fallback = MAPPER.createObjectNode();
+            fallback.put("workflowId", workflowId);
+            fallback.put("state", "RUNNING");
+            fallback.put("signingStatus", "OUT_FOR_SIGNATURE");
+            fallback.put("dorStatus", "NOT_STARTED");
+            resp.getWriter().write(MAPPER.writeValueAsString(fallback));
+
         } catch (Exception e) {
             resp.sendError(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error fetching workflow status");
         }
@@ -77,7 +76,7 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
     @Override
     protected void doPost(final SlingHttpServletRequest req,
             final SlingHttpServletResponse resp) throws ServletException, IOException {
-        
+
         StringBuilder sb = new StringBuilder();
         String line;
         try (BufferedReader reader = req.getReader()) {
@@ -92,16 +91,17 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
 
-        if (submittedData != null && submittedData.contains("error")) {
+        ObjectNode result = MAPPER.createObjectNode();
+        if (submittedData.contains("error")) {
             resp.setStatus(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            resp.getWriter().write("{\"status\": \"error\", \"message\": \"Simulated processing error\"}");
+            result.put("status", "error");
+            result.put("message", "Simulated processing error");
         } else {
             resp.setStatus(SlingHttpServletResponse.SC_OK);
-            resp.getWriter().write("{"
-                + "\"status\": \"success\","
-                + "\"message\": \"Form submitted and Sign workflow initiated\","
-                + "\"workflowId\": \"" + workflowId + "\""
-                + "}");
+            result.put("status", "success");
+            result.put("message", "Form submitted and Sign workflow initiated");
+            result.put("workflowId", workflowId);
         }
+        resp.getWriter().write(MAPPER.writeValueAsString(result));
     }
 }

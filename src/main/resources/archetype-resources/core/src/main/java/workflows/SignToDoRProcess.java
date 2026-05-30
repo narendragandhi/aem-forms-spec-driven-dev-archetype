@@ -1,19 +1,17 @@
 package ${package}.workflows;
 
+import ${package}.services.AdobeSignOrchestrator;
+import ${package}.services.FormSubmissionService;
 import com.adobe.granite.workflow.WorkflowException;
 import com.adobe.granite.workflow.WorkflowSession;
 import com.adobe.granite.workflow.exec.WorkItem;
 import com.adobe.granite.workflow.exec.WorkflowProcess;
 import com.adobe.granite.workflow.metadata.MetaDataMap;
-import ${package}.services.AdobeSignOrchestrator;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Workflow process that orchestrates Adobe Sign and subsequent DoR generation.
- */
 @Component(
     service = WorkflowProcess.class,
     property = {
@@ -27,10 +25,13 @@ public class SignToDoRProcess implements WorkflowProcess {
     @Reference
     private AdobeSignOrchestrator signOrchestrator;
 
+    @Reference
+    private FormSubmissionService formSubmissionService;
+
     @Override
-    public void execute(WorkItem workItem, WorkflowSession workflowSession, MetaDataMap metaDataMap) 
+    public void execute(WorkItem workItem, WorkflowSession workflowSession, MetaDataMap metaDataMap)
             throws WorkflowException {
-        
+
         String payload = workItem.getWorkflowData().getPayload().toString();
         MetaDataMap wfMetadata = workItem.getWorkflow().getMetaDataMap();
         String agreementId = wfMetadata.get("adobeSignAgreementId", String.class);
@@ -42,7 +43,7 @@ public class SignToDoRProcess implements WorkflowProcess {
         } else {
             String status = signOrchestrator.getStatus(agreementId);
             wfMetadata.put("signingStatus", status);
-            
+
             if ("SIGNED".equals(status)) {
                 generateDoR(payload);
                 wfMetadata.put("dorStatus", "GENERATED");
@@ -50,7 +51,8 @@ public class SignToDoRProcess implements WorkflowProcess {
         }
     }
 
-    private void generateDoR(String data) {
-        LOG.info("MOCK DoR GENERATION: Creating PDF Document of Record for data...");
+    private void generateDoR(String payload) {
+        LOG.info("Generating Document of Record for payload: {}", payload);
+        formSubmissionService.processSubmission(payload, "sign-to-dor-workflow");
     }
 }

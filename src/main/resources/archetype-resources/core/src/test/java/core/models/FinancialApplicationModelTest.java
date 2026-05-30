@@ -47,4 +47,40 @@ class FinancialApplicationModelTest {
         assertEquals(2, model.getEmploymentHistory().size());
         assertEquals("Tech", model.getEmploymentHistory().get(0).getCompany());
     }
+
+    @Test
+    void testEmploymentRecordFields() {
+        Resource resource = context.resourceResolver().getResource("/content/finance");
+        FinancialApplicationModel model = resource.adaptTo(FinancialApplicationModel.class);
+
+        assertNotNull(model);
+        FinancialApplicationModel.EmploymentRecord job1 = model.getEmploymentHistory().get(0);
+        assertAll("First employment record",
+            () -> assertEquals("Tech", job1.getCompany()),
+            () -> assertEquals("Dev", job1.getRole()),
+            () -> assertEquals("3", job1.getYears())
+        );
+    }
+
+    @Test
+    void testGetExportedType() {
+        Resource resource = context.resourceResolver().getResource("/content/finance");
+        FinancialApplicationModel model = resource.adaptTo(FinancialApplicationModel.class);
+
+        assertNotNull(model);
+        assertNotNull(model.getExportedType());
+        assertTrue(model.getExportedType().contains("financial-application"));
+    }
+
+    @Test
+    void testModelWithMissingCustomerFields() {
+        context.create().resource("/content/empty-finance");
+        Resource resource = context.resourceResolver().getResource("/content/empty-finance");
+        FinancialApplicationModel model = resource.adaptTo(FinancialApplicationModel.class);
+
+        assertNotNull(model);
+        assertNull(model.getCustomerId());
+        assertNull(model.getCustomerName());
+        assertNull(model.getCustomerStatus());
+    }
 }

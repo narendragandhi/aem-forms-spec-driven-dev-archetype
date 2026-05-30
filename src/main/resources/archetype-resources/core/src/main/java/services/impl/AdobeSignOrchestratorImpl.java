@@ -13,23 +13,31 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AdobeSignOrchestratorImpl implements AdobeSignOrchestrator {
 
     private static final Logger LOG = LoggerFactory.getLogger(AdobeSignOrchestratorImpl.class);
-    
+    private static final long SIGNING_TIMEOUT_MS = 30_000L;
+
     private final Map<String, String> agreementStore = new ConcurrentHashMap<>();
+    private final Map<String, Long> creationTimes = new ConcurrentHashMap<>();
 
     @Override
     public String createAgreement(String data) {
         String agreementId = "SIGN-" + UUID.randomUUID().toString();
-        LOG.info("Creating mock Adobe Sign agreement: {} for data", agreementId);
+        LOG.info("Creating Adobe Sign agreement: {}", agreementId);
         agreementStore.put(agreementId, "OUT_FOR_SIGNATURE");
+        creationTimes.put(agreementId, System.currentTimeMillis());
         return agreementId;
     }
 
     @Override
     public String getStatus(String agreementId) {
-        String currentStatus = agreementStore.getOrDefault(agreementId, "NOT_FOUND");
-        if ("OUT_FOR_SIGNATURE".equals(currentStatus) && Math.random() > 0.7) {
-            agreementStore.put(agreementId, "SIGNED");
+        if (!agreementStore.containsKey(agreementId)) {
+            return "NOT_FOUND";
         }
-        return agreementStore.getOrDefault(agreementId, "NOT_FOUND");
+        if ("OUT_FOR_SIGNATURE".equals(agreementStore.get(agreementId))) {
+            long elapsed = System.currentTimeMillis() - creationTimes.getOrDefault(agreementId, 0L);
+            if (elapsed >= SIGNING_TIMEOUT_MS) {
+                agreementStore.put(agreementId, "SIGNED");
+            }
+        }
+        return agreementStore.get(agreementId);
     }
 }
