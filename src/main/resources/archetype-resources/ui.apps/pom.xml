@@ -55,9 +55,7 @@
                     <name>${artifactId}.ui.apps</name>
                     <packageType>application</packageType>
                     <acHandling>overwrite</acHandling>
-                    <skipSubPackageValidation>true</skipSubPackageValidation>
-                    <failOnValidationError>false</failOnValidationError>
-                    <skipValidation>true</skipValidation>
+                    <failOnValidationError>true</failOnValidationError>
                     <dependencies>
                     </dependencies>
                     <types>
@@ -129,17 +127,6 @@
             <type>zip</type>
         </dependency>
 
-
-        <!-- SPA Project Core (includes hierarchy page) -->
-        <dependency>
-            <groupId>com.adobe.aem</groupId>
-            <artifactId>spa.project.core.ui.apps</artifactId>
-            <type>zip</type>
-        </dependency>
-        <dependency>
-            <groupId>com.adobe.aem</groupId>
-            <artifactId>spa.project.core.core</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>com.adobe.aem</groupId>

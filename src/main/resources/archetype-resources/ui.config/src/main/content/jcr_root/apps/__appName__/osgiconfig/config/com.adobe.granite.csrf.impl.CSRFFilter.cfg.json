@@ -1,0 +1,7 @@
+{
+  "filter.methods": ["POST","PUT","DELETE"],
+  "excluded.urls": [
+    "/libs/granite/csrf/token.json",
+    "/system/sling/login"
+  ]
+}
