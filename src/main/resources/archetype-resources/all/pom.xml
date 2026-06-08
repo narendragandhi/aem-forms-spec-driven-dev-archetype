@@ -51,9 +51,6 @@
                 <configuration>
                     <group>${groupId}</group>
                     <packageType>container</packageType>
-                    <!-- skip sub package validation for now as some vendor packages like CIF apps will not pass -->
-                    <skipSubPackageValidation>true</skipSubPackageValidation>
-                    <skipValidation>true</skipValidation>
                     <embeddeds>
                         <embedded>
                             <groupId>${groupId}</groupId>
@@ -77,16 +74,6 @@
                             <artifactId>${artifactId}.ui.config</artifactId>
                             <type>zip</type>
                             <target>/apps/${artifactId}-packages/application/install</target>
-                        </embedded>
-                        <embedded>
-                            <groupId>com.adobe.aem</groupId>
-                            <artifactId>spa.project.core.core</artifactId>
-                            <target>/apps/${appName}-vendor-packages/application/install</target>
-                        </embedded>
-                        <embedded>
-                            <groupId>com.adobe.aem</groupId>
-                            <artifactId>spa.project.core.ui.apps</artifactId>
-                            <target>/apps/${appName}-vendor-packages/application/install</target>
                         </embedded>
                     </embeddeds>
                 </configuration>
@@ -208,15 +195,5 @@
             <type>zip</type>
         </dependency>
 
-        <!-- SPA Project Core (includes hierarchy page) -->
-        <dependency>
-            <groupId>com.adobe.aem</groupId>
-            <artifactId>spa.project.core.ui.apps</artifactId>
-            <type>zip</type>
-        </dependency>
-        <dependency>
-            <groupId>com.adobe.aem</groupId>
-            <artifactId>spa.project.core.core</artifactId>
-        </dependency>
     </dependencies>
 </project>

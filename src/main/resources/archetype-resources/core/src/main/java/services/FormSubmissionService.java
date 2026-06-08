@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  * This service can be invoked from a workflow process step after a user submits an Adaptive Form.
  * It demonstrates how to integrate with external systems via a REST API, with configurable endpoints.
  */
-@Component(service = FormSubmissionService.class, immediate = true)
+@Component(service = FormSubmissionService.class)
 @Designate(ocd = FormSubmissionService.Config.class)
 public class FormSubmissionService {
 

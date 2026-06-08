@@ -4,7 +4,7 @@ import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Component(service = SpecToCodeGenerator.class, immediate = true)
+@Component(service = SpecToCodeGenerator.class)
 public class SpecToCodeGenerator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SpecToCodeGenerator.class);

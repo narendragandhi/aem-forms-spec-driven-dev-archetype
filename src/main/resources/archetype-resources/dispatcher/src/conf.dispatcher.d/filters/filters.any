@@ -11,3 +11,25 @@ $include "./default_filters.any"
 
 # Allow manifest.webmanifest files located in the content
 /0102 { /type "allow" /extension "webmanifest" /path "/content/*/manifest" }
+
+# ---- AEM Forms paths ----
+
+# Adaptive Forms v2 content and model endpoints
+/0200 { /type "allow" /path "/content/forms/af/*" }
+/0201 { /type "allow" /extension "json" /selectors "model" /path "/content/forms/af/*" }
+/0202 { /type "allow" /extension "json" /selectors "guideContainer" /path "/content/forms/af/*" }
+
+# AEM Forms runtime libraries (fd namespace)
+/0210 { /type "allow" /path "/libs/fd/*" }
+/0211 { /type "allow" /path "/libs/granite/csrf/token.json" }
+
+# Adobe Forms headless API endpoints (submit + status polling)
+/0220 { /type "allow" /method "GET"  /path "/bin/bmad/headless-status" }
+/0221 { /type "allow" /method "POST" /path "/bin/bmad/headless-submit" }
+/0222 { /type "allow" /method "GET"  /path "/bin/bmad/headless-form" }
+
+# AEM Forms submission endpoint (used by Adaptive Forms core components)
+/0230 { /type "allow" /method "POST" /path "/adobe/forms/af/submit/*" }
+
+# Form Data Model (FDM) prefill endpoint
+/0240 { /type "allow" /method "GET"  /path "/adobe/forms/af/prefill/*" }

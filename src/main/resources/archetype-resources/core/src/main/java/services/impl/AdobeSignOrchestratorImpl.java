@@ -2,6 +2,7 @@ package ${package}.services.impl;
 
 import ${package}.services.AdobeSignOrchestrator;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +26,12 @@ public class AdobeSignOrchestratorImpl implements AdobeSignOrchestrator {
         agreementStore.put(agreementId, "OUT_FOR_SIGNATURE");
         creationTimes.put(agreementId, System.currentTimeMillis());
         return agreementId;
+    }
+
+    @Deactivate
+    protected void deactivate() {
+        agreementStore.clear();
+        creationTimes.clear();
     }
 
     @Override

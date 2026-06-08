@@ -10,6 +10,8 @@ import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
 import org.apache.sling.servlets.annotations.SlingServletPaths;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.propertytypes.ServiceDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +28,12 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
 
     private static final Logger LOG = LoggerFactory.getLogger(HeadlessSubmitServlet.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    // CSRF token header sent by AEM Forms clients (obtained from /libs/granite/csrf/token.json)
+    private static final String CSRF_TOKEN_HEADER = "CSRF-Token";
+
+    @Reference(cardinality = ReferenceCardinality.OPTIONAL)
+    private volatile com.adobe.granite.csrf.CSRFSupport csrfSupport;
 
     @Override
     protected void doGet(final SlingHttpServletRequest req,
@@ -76,6 +84,13 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
     @Override
     protected void doPost(final SlingHttpServletRequest req,
             final SlingHttpServletResponse resp) throws ServletException, IOException {
+
+        // CSRF validation — Granite filter also enforces this at the filter level for /bin/ paths.
+        // We check explicitly here for defense-in-depth.
+        if (csrfSupport != null && !csrfSupport.isValidRequest(req, resp)) {
+            resp.sendError(SlingHttpServletResponse.SC_FORBIDDEN, "CSRF token validation failed");
+            return;
+        }
 
         StringBuilder sb = new StringBuilder();
         String line;
