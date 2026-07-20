@@ -133,7 +133,7 @@
     },
     "notes": {
       "type": "array",
-      "description": "Persistent notes for cross-session memory",
+      "description": "Persistent notes for cross-session memory (decayed summaries of old closed tasks)",
       "items": {
         "type": "object",
         "properties": {
@@ -142,6 +142,29 @@
           "content": { "type": "string" }
         }
       }
+    },
+    "graph_links": {
+      "type": "array",
+      "description": "Knowledge graph relationships between issues (Beads v1.0)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["relates_to", "duplicates", "supersedes", "replies_to"],
+            "description": "Relationship type"
+          },
+          "source_id": { "type": "string", "description": "Hash-based source issue ID (e.g. aem-forms-bmad-showcase-abc1)" },
+          "target_id": { "type": "string", "description": "Hash-based target issue ID" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["type", "source_id", "target_id"]
+      }
+    },
+    "beads_version": {
+      "type": "string",
+      "description": "Version of Beads CLI in use (e.g. 1.0.0)",
+      "default": "1.0.0"
     }
   },
   "required": ["agent", "last_updated", "session_count"]

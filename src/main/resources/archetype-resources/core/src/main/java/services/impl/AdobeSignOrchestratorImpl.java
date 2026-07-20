@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AdobeSignOrchestratorImpl implements AdobeSignOrchestrator {
 
     private static final Logger LOG = LoggerFactory.getLogger(AdobeSignOrchestratorImpl.class);
-    private static final long SIGNING_TIMEOUT_MS = 30_000L;
+    long signingTimeoutMs = 30_000L; // package-private so unit tests can override
 
     private final Map<String, String> agreementStore = new ConcurrentHashMap<>();
     private final Map<String, Long> creationTimes = new ConcurrentHashMap<>();
@@ -41,7 +41,7 @@ public class AdobeSignOrchestratorImpl implements AdobeSignOrchestrator {
         }
         if ("OUT_FOR_SIGNATURE".equals(agreementStore.get(agreementId))) {
             long elapsed = System.currentTimeMillis() - creationTimes.getOrDefault(agreementId, 0L);
-            if (elapsed >= SIGNING_TIMEOUT_MS) {
+            if (elapsed >= signingTimeoutMs) {
                 agreementStore.put(agreementId, "SIGNED");
             }
         }

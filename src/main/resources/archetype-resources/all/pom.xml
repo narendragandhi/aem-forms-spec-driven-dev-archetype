@@ -51,6 +51,13 @@
                 <configuration>
                     <group>${groupId}</group>
                     <packageType>container</packageType>
+                    <validatorsSettings>
+                        <!-- ui.config's /apps/${appName}/osgiconfig intentionally nests
+                             inside ui.apps' /apps/${appName}; both install cleanly -->
+                        <jackrabbit-overlappingfilter>
+                            <defaultSeverity>WARN</defaultSeverity>
+                        </jackrabbit-overlappingfilter>
+                    </validatorsSettings>
                     <embeddeds>
                         <embedded>
                             <groupId>${groupId}</groupId>

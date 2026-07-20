@@ -17,6 +17,8 @@ package ${package}.core.schedulers;
 
 import java.util.List;
 
+import com.google.common.base.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -82,7 +84,8 @@ class SimpleScheduledTaskTest {
 
         List<LoggingEvent> events = logger.getLoggingEvents();
         assertEquals(1, events.size());
-        assertNull(events.get(0).getArguments().get(0));
+        // slf4j-test stores null log arguments as Guava Optional.absent()
+        assertEquals(Optional.absent(), events.get(0).getArguments().get(0));
     }
 
     @Test

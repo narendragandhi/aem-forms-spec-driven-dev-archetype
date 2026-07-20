@@ -39,7 +39,7 @@ class HeadlessFormServiceTest {
     void testGetResponseContentType(AemContext context) throws ServletException, IOException {
         context.request().addRequestParameter("formPath", "/content/forms/myform");
         servlet.doGet(context.request(), context.response());
-        assertEquals("application/json", context.response().getContentType());
+        assertTrue(context.response().getContentType().startsWith("application/json"));
     }
 
     @Test

@@ -48,7 +48,8 @@
         <vault.password>admin</vault.password>
         <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
         <core.wcm.components.version>2.27.0</core.wcm.components.version>
-        <aem.forms.sdk.api>2026.2.15.00-260200</aem.forms.sdk.api>
+        <!-- Update this to match the aem.sdk.api release (same YYMM suffix) when upgrading the AEM release -->
+        <aem.forms.sdk.api>2025.12.15.00-251200</aem.forms.sdk.api>
         <bnd.version>7.1.0</bnd.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>

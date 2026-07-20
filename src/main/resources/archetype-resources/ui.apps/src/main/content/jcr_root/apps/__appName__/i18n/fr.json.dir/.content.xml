@@ -4,5 +4,6 @@
     jcr:mixinTypes="[mix:language]"
     jcr:primaryType="nt:file">
     <jcr:content
-        jcr:primaryType="nt:resource"/>
+        jcr:primaryType="nt:resource"
+        jcr:data="{Binary}"/>
 </jcr:root>

@@ -22,6 +22,14 @@ Include conf.d/variables/custom.vars
 	# Add header breadcrumbs for help in troubleshooting
 	<IfModule mod_headers.c>
 		Header add X-Vhost "publish"
+
+		# Security headers
+		Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		Header always set X-Content-Type-Options "nosniff"
+		Header always set X-Frame-Options "SAMEORIGIN"
+		Header always set Referrer-Policy "strict-origin-when-cross-origin"
+		Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.adobe.com *.adobeaemcloud.com; style-src 'self' 'unsafe-inline' *.adobe.com; img-src 'self' data: *.adobe.com; connect-src 'self' *.adobe.com *.adobeaemcloud.com; frame-ancestors 'self'"
 	</IfModule>
 	<Directory />
 		<IfModule disp_apache2.c>
@@ -41,8 +49,6 @@ Include conf.d/variables/custom.vars
 		SetOutputFilter DEFLATE
 		# Don't compress images
 		SetEnvIfNoCase Request_URI \.(?:gif|jpe?g|png)$ no-gzip dont-vary
-		# Prevent clickjacking
-		Header always append X-Frame-Options SAMEORIGIN
 	</Directory>
 	<Directory "${DOCROOT}">
 		AllowOverride None

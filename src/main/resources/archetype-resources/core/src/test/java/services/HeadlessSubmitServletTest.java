@@ -1,7 +1,11 @@
 package ${package}.services;
 
+import com.adobe.granite.workflow.WorkflowSession;
+import com.adobe.granite.workflow.exec.Workflow;
+import com.adobe.granite.workflow.metadata.MetaDataMap;
 import io.wcm.testing.mock.aem.junit5.AemContext;
 import io.wcm.testing.mock.aem.junit5.AemContextExtension;
+import org.apache.sling.api.resource.ResourceResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -10,6 +14,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(AemContextExtension.class)
 class HeadlessSubmitServletTest {
@@ -37,7 +43,7 @@ class HeadlessSubmitServletTest {
     void testGetResponseContentType(AemContext context) throws ServletException, IOException {
         context.request().addRequestParameter("workflowId", "WF-12345");
         servlet.doGet(context.request(), context.response());
-        assertEquals("application/json", context.response().getContentType());
+        assertTrue(context.response().getContentType().startsWith("application/json"));
     }
 
     @Test
@@ -52,6 +58,74 @@ class HeadlessSubmitServletTest {
         context.request().addRequestParameter("workflowId", "WF-test");
         servlet.doGet(context.request(), context.response());
         assertTrue(context.response().getOutputAsString().contains("dorStatus"));
+    }
+
+    @Test
+    void testGetWithWorkflowSessionReturnsWorkflowStatus(AemContext context) throws Exception {
+        Workflow workflow = mock(Workflow.class);
+        MetaDataMap metaData = mock(MetaDataMap.class);
+        when(workflow.getState()).thenReturn("RUNNING");
+        when(workflow.getMetaDataMap()).thenReturn(metaData);
+        when(metaData.get("signingStatus", String.class)).thenReturn("SIGNED");
+        when(metaData.get("dorStatus", String.class)).thenReturn("COMPLETED");
+
+        WorkflowSession session = mock(WorkflowSession.class);
+        when(session.getWorkflow("WF-real")).thenReturn(workflow);
+        context.registerAdapter(ResourceResolver.class, WorkflowSession.class, session);
+
+        context.request().addRequestParameter("workflowId", "WF-real");
+        servlet.doGet(context.request(), context.response());
+
+        String output = context.response().getOutputAsString();
+        assertTrue(output.contains("\"state\":\"RUNNING\""));
+        assertTrue(output.contains("\"signingStatus\":\"SIGNED\""));
+        assertTrue(output.contains("\"dorStatus\":\"COMPLETED\""));
+    }
+
+    @Test
+    void testGetWithWorkflowMissingMetadataUsesDefaults(AemContext context) throws Exception {
+        Workflow workflow = mock(Workflow.class);
+        MetaDataMap metaData = mock(MetaDataMap.class);
+        when(workflow.getState()).thenReturn(null);
+        when(workflow.getMetaDataMap()).thenReturn(metaData);
+
+        WorkflowSession session = mock(WorkflowSession.class);
+        when(session.getWorkflow("WF-empty")).thenReturn(workflow);
+        context.registerAdapter(ResourceResolver.class, WorkflowSession.class, session);
+
+        context.request().addRequestParameter("workflowId", "WF-empty");
+        servlet.doGet(context.request(), context.response());
+
+        String output = context.response().getOutputAsString();
+        assertTrue(output.contains("\"state\":\"UNKNOWN\""));
+        assertTrue(output.contains("\"signingStatus\":\"PENDING\""));
+        assertTrue(output.contains("\"dorStatus\":\"NOT_STARTED\""));
+    }
+
+    @Test
+    void testGetWithUnknownWorkflowIdFallsBack(AemContext context) throws Exception {
+        WorkflowSession session = mock(WorkflowSession.class);
+        when(session.getWorkflow("WF-unknown")).thenReturn(null);
+        context.registerAdapter(ResourceResolver.class, WorkflowSession.class, session);
+
+        context.request().addRequestParameter("workflowId", "WF-unknown");
+        servlet.doGet(context.request(), context.response());
+
+        String output = context.response().getOutputAsString();
+        assertTrue(output.contains("WF-unknown"));
+        assertTrue(output.contains("\"state\":\"RUNNING\""));
+    }
+
+    @Test
+    void testGetWorkflowLookupFailureReturns500(AemContext context) throws Exception {
+        WorkflowSession session = mock(WorkflowSession.class);
+        when(session.getWorkflow("WF-boom")).thenThrow(new RuntimeException("lookup failed"));
+        context.registerAdapter(ResourceResolver.class, WorkflowSession.class, session);
+
+        context.request().addRequestParameter("workflowId", "WF-boom");
+        servlet.doGet(context.request(), context.response());
+
+        assertEquals(500, context.response().getStatus());
     }
 
     // --- POST (form submission) ---
@@ -87,7 +161,7 @@ class HeadlessSubmitServletTest {
         context.request().setContent("{\"error\":true}".getBytes(StandardCharsets.UTF_8));
         context.request().setContentType("application/json");
         servlet.doPost(context.request(), context.response());
-        assertTrue(context.response().getOutputAsString().contains("\"status\": \"error\""));
+        assertTrue(context.response().getOutputAsString().contains("\"status\":\"error\""));
     }
 
     @Test
@@ -95,7 +169,7 @@ class HeadlessSubmitServletTest {
         context.request().setContent("{}".getBytes(StandardCharsets.UTF_8));
         context.request().setContentType("application/json");
         servlet.doPost(context.request(), context.response());
-        assertEquals("application/json", context.response().getContentType());
+        assertTrue(context.response().getContentType().startsWith("application/json"));
     }
 
     @Test
@@ -103,7 +177,7 @@ class HeadlessSubmitServletTest {
         context.request().setContent("{\"name\":\"Test\"}".getBytes(StandardCharsets.UTF_8));
         context.request().setContentType("application/json");
         servlet.doPost(context.request(), context.response());
-        assertTrue(context.response().getOutputAsString().contains("\"status\": \"success\""));
+        assertTrue(context.response().getOutputAsString().contains("\"status\":\"success\""));
     }
 
     @Test

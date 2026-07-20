@@ -66,7 +66,7 @@ class SpecToCodeGeneratorTest {
         List<LoggingEvent> events = logger.getLoggingEvents();
 
         boolean hasCompletionLog = events.stream()
-            .anyMatch(e -> e.getMessage().contains("Spec-to-Code Generation (conceptual) completed"));
+            .anyMatch(e -> e.getMessage().contains("Spec-to-Code Generation completed for:"));
         assertTrue(hasCompletionLog, "Should log completion message");
     }
 

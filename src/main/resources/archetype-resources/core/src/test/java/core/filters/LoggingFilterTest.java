@@ -29,6 +29,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.google.common.base.Optional;
+
 import io.wcm.testing.mock.aem.junit5.AemContext;
 import io.wcm.testing.mock.aem.junit5.AemContextExtension;
 import uk.org.lidalia.slf4jext.Level;
@@ -89,7 +91,8 @@ class LoggingFilterTest {
         assertEquals(1, events.size());
         LoggingEvent event = events.get(0);
         assertEquals("/content/page", event.getArguments().get(0));
-        assertNull(event.getArguments().get(1));
+        // slf4j-test stores null log arguments as Guava Optional.absent()
+        assertEquals(Optional.absent(), event.getArguments().get(1));
     }
 
     @Test

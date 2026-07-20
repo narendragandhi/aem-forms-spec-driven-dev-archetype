@@ -2,4 +2,19 @@
 <workspaceFilter version="1.0">
     <filter root="/content/${appName}" mode="merge"/>
     <filter root="/conf/${appName}" mode="merge"/>
+    <!-- Showcase site content (kept under its own name; referenced by sample forms/themes) -->
+    <filter root="/conf/aem-forms-bmad-showcase" mode="merge"/>
+    <filter root="/content/aem-forms-bmad-showcase" mode="merge"/>
+    <filter root="/content/dam/aem-forms-bmad-showcase" mode="merge"/>
+    <filter root="/content/experience-fragments/aem-forms-bmad-showcase" mode="merge"/>
+    <!-- Adaptive Forms and Interactive Communications -->
+    <filter root="/content/forms/af/${appName}" mode="merge"/>
+    <filter root="/content/forms/af/aem-forms-bmad-showcase" mode="merge"/>
+    <filter root="/content/forms/ic/${appName}" mode="merge"/>
+    <filter root="/content/dam/formsanddocuments/fragments/${appName}" mode="merge"/>
+    <filter root="/content/dam/formsanddocuments/ic/${appName}" mode="merge"/>
+    <filter root="/content/dam/formsanddocuments/ic-templates/${appName}" mode="merge"/>
+    <filter root="/content/dam/formsanddocuments-fdm/${appName}" mode="merge"/>
+    <filter root="/content/dam/formsanddocuments-fdm/aem-forms-bmad-showcase" mode="merge"/>
+    <filter root="/content/dam/formsanddocuments-themes/aem-forms-bmad-showcase" mode="merge"/>
 </workspaceFilter>

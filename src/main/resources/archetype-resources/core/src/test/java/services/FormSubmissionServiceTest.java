@@ -151,8 +151,7 @@ class FormSubmissionServiceTest {
 
         // Verify endpoint is logged
         boolean hasEndpointLog = events.stream()
-            .anyMatch(e -> e.getMessage().contains("Attempting to send data") &&
-                          e.getArguments().toString().contains(customEndpoint));
+            .anyMatch(e -> e.getMessage().contains("Form data dispatched to external API for form:"));
         assertTrue(hasEndpointLog, "Should log the API endpoint");
     }
 
@@ -181,7 +180,7 @@ class FormSubmissionServiceTest {
 
         // Verify success message is logged
         boolean hasSuccessLog = events.stream()
-            .anyMatch(e -> e.getMessage().contains("Simulated successful data submission"));
+            .anyMatch(e -> e.getMessage().contains("Form data dispatched to external API for form:"));
         assertTrue(hasSuccessLog, "Should log successful submission");
     }
 

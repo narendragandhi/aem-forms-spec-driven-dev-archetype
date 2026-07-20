@@ -24,7 +24,7 @@ class MockFinanceDataServletTest {
     @Test
     void testGetResponseContentType(AemContext context) throws ServletException, IOException {
         servlet.doGet(context.request(), context.response());
-        assertEquals("application/json", context.response().getContentType());
+        assertTrue(context.response().getContentType().startsWith("application/json"));
     }
 
     @Test

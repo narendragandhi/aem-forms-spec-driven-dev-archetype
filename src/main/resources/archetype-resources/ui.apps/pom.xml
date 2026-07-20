@@ -56,6 +56,15 @@
                     <packageType>application</packageType>
                     <acHandling>overwrite</acHandling>
                     <failOnValidationError>true</failOnValidationError>
+                    <validatorsSettings>
+                        <jackrabbit-filter>
+                            <options>
+                                <!-- validRoots replaces the defaults, so restate them;
+                                     /apps/fd/af/themes is where Adaptive Forms themes deploy -->
+                                <validRoots>/,/libs,/apps,/etc,/var,/tmp,/content,/apps/fd,/apps/fd/af,/apps/fd/af/themes</validRoots>
+                            </options>
+                        </jackrabbit-filter>
+                    </validatorsSettings>
                     <dependencies>
                     </dependencies>
                     <types>

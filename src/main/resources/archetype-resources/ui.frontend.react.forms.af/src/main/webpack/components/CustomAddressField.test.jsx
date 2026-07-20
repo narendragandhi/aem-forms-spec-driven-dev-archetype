@@ -1,6 +1,18 @@
 import React from 'react';
+import { vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
+
+// Mock the AEM Forms wrapper: its CJS build require()s the ESM-only
+// @adobe/json-formula, which node cannot load in the vitest environment.
+// The unit under test is the render component, not the framework wrapper.
+vi.mock('@aemforms/af-react-components', () => ({
+  Field: (props) => {
+    const Render = props.render;
+    return <Render {...props} />;
+  },
+}));
+
 import CustomAddressField from './CustomAddressField';
 
 describe('CustomAddressField', () => {

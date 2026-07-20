@@ -12,6 +12,7 @@ class AdobeSignOrchestratorImplTest {
     @BeforeEach
     void setUp() {
         orchestrator = new AdobeSignOrchestratorImpl();
+        orchestrator.signingTimeoutMs = 0; // fire immediately so polling tests don't wait 30s
     }
 
     @Test

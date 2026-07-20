@@ -30,7 +30,16 @@
             <excludes>
                 <exclude>ui.frontend/node_modules/**</exclude>
                 <exclude>ui.frontend.react.forms.af/node_modules/**</exclude>
+                <!-- number-format patterns contain '##' which Velocity strips as comments -->
+                <exclude>ui.content/src/main/content/jcr_root/conf/aem-forms-bmad-showcase/settings/wcm/policies/.content.xml</exclude>
             </excludes>
+        </fileSet>
+        <!-- unfiltered copy of the policies file excluded above (no placeholders in it) -->
+        <fileSet filtered="false">
+            <directory>ui.content/src/main/content/jcr_root/conf/aem-forms-bmad-showcase/settings/wcm/policies</directory>
+            <includes>
+                <include>.content.xml</include>
+            </includes>
         </fileSet>
         <fileSet filtered="true" packaged="true">
             <directory>core/src/main/java</directory>
@@ -44,7 +53,19 @@
                 <include>**/*.java</include>
             </includes>
         </fileSet>
-        <!-- ui.frontend.react.forms.af: all non-pom files (package.json, src/, public/, cypress/) -->
+        <!-- ui.frontend.react.forms.af: filter files with ${appName}/${artifactId} placeholders;
+             undefined Velocity refs (JS template literals) pass through unchanged.
+             package-lock.json stays unfiltered — npm reconciles its name field on install. -->
+        <fileSet filtered="true">
+            <directory>ui.frontend.react.forms.af</directory>
+            <includes>
+                <include>src/App.jsx</include>
+                <include>package.json</include>
+                <include>index.html</include>
+                <include>public/index.html</include>
+            </includes>
+        </fileSet>
+        <!-- ui.frontend.react.forms.af: all other non-pom files (package.json, src/, public/, cypress/) -->
         <fileSet filtered="false">
             <directory>ui.frontend.react.forms.af</directory>
             <includes>
@@ -52,6 +73,10 @@
             </includes>
             <excludes>
                 <exclude>pom.xml</exclude>
+                <exclude>src/App.jsx</exclude>
+                <exclude>package.json</exclude>
+                <exclude>index.html</exclude>
+                <exclude>public/index.html</exclude>
                 <exclude>node_modules/**</exclude>
                 <exclude>**/node_modules/**</exclude>
             </excludes>
@@ -123,6 +148,7 @@
                 <include>**/*.sh</include>
             </includes>
         </fileSet>
+        <!-- NOT filtered: Velocity treats markdown '##' headings as line comments -->
         <fileSet filtered="false">
             <directory></directory>
             <includes>
