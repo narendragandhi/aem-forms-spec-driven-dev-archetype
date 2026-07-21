@@ -7,14 +7,6 @@
             <defaultValue>afaacs</defaultValue>
             <validationRegex>afaacs|6\.5</validationRegex>
         </requiredProperty>
-        <requiredProperty key="includeSpecDrivenExamples">
-            <defaultValue>true</defaultValue>
-            <validationRegex>true|false</validationRegex>
-        </requiredProperty>
-        <requiredProperty key="includeShowcaseExamples">
-            <defaultValue>true</defaultValue>
-            <validationRegex>true|false</validationRegex>
-        </requiredProperty>
         <requiredProperty key="appName">
             <defaultValue>MyFormsApp</defaultValue>
         </requiredProperty>

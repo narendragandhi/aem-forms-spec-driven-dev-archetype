@@ -28,7 +28,7 @@ mvn archetype:generate \
     -Dversion=1.0.0-SNAPSHOT \
     -Dpackage=com.mycompany \
     -DappName=MyFormsApp \
-    -DaemVersion=cloud
+    -DformsVersion=afaacs
 
 # 3. Build and deploy
 cd my-forms-project
@@ -182,10 +182,7 @@ Document pdf = icService.generate(
 | `groupId` | - | Maven group ID |
 | `artifactId` | - | Maven artifact ID |
 | `appName` | - | Application name (used in paths) |
-| `aemVersion` | `cloud` | AEM version (`cloud`, `6.5`) |
-| `formsVersion` | `afaacs` | Forms version (`afaacs`, `6.5`) |
-| `includeSpecDrivenExamples` | `true` | Include spec-driven form examples |
-| `includeShowcaseExamples` | `true` | Include showcase components |
+| `formsVersion` | `afaacs` | Forms version (`afaacs` for AEM as a Cloud Service, `6.5` for AEM 6.5) |
 
 ## Build Profiles
 
