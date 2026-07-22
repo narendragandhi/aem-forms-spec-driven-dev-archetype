@@ -175,6 +175,21 @@ Document pdf = icService.generate(
 
 > See `bmad/00-Project-Initialization/forms-version-compatibility.md` for AFaaCS vs 6.5 guidance.
 
+## Keeping Projects in Sync With the Archetype
+
+Maven archetypes generate a project once and then have no further
+relationship to the template. `tools/archetype-sync/` closes that gap
+for three scenarios:
+
+- A project already generated from this archetype that wants to pull in
+  later fixes.
+- An existing AEM Forms project — never generated from this archetype —
+  that wants to adopt just the spec-driven-dev framework layer
+  (`bmad/`, `specs/`, `AGENTS.md`) without a full rewrite.
+- Either of the above, updated again later.
+
+See [tools/archetype-sync/README.md](tools/archetype-sync/README.md).
+
 ## Configuration Options
 
 | Property | Default | Description |
