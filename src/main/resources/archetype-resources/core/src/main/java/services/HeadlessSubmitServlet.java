@@ -2,6 +2,7 @@ package ${package}.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.adobe.granite.workflow.WorkflowException;
 import com.adobe.granite.workflow.WorkflowSession;
 import com.adobe.granite.workflow.exec.Workflow;
 import org.apache.sling.api.SlingHttpServletRequest;
@@ -44,8 +45,16 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
         WorkflowSession wfSession = resolver.adaptTo(WorkflowSession.class);
 
         try {
+            Workflow wf = null;
             if (wfSession != null) {
-                Workflow wf = wfSession.getWorkflow(workflowId);
+                try {
+                    wf = wfSession.getWorkflow(workflowId);
+                } catch (WorkflowException e) {
+                    // AEM throws for an unknown/invalid workflow id rather than
+                    // returning null; treat that the same as "not found" and
+                    // fall through to the fallback response below.
+                    LOG.debug("No workflow found for id: {}", workflowId, e);
+                }
                 if (wf != null) {
                     String state = wf.getState();
                     String signingStatus = (String) wf.getMetaDataMap().get("signingStatus", String.class);
@@ -69,6 +78,7 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
             resp.getWriter().write(MAPPER.writeValueAsString(fallback));
 
         } catch (Exception e) {
+            LOG.error("Error fetching workflow status for workflowId: {}", workflowId, e);
             resp.sendError(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error fetching workflow status");
         }
     }

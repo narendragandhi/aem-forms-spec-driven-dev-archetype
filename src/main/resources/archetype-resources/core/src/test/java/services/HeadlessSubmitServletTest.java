@@ -1,5 +1,6 @@
 package ${package}.services;
 
+import com.adobe.granite.workflow.WorkflowException;
 import com.adobe.granite.workflow.WorkflowSession;
 import com.adobe.granite.workflow.exec.Workflow;
 import com.adobe.granite.workflow.metadata.MetaDataMap;
@@ -104,8 +105,12 @@ class HeadlessSubmitServletTest {
 
     @Test
     void testGetWithUnknownWorkflowIdFallsBack(AemContext context) throws Exception {
+        // Real AEM throws WorkflowException for an unknown/invalid workflow id
+        // rather than returning null from getWorkflow() — verified against a
+        // live AEM instance. A mock returning null here would pass without
+        // ever exercising the code path real AEM actually takes.
         WorkflowSession session = mock(WorkflowSession.class);
-        when(session.getWorkflow("WF-unknown")).thenReturn(null);
+        when(session.getWorkflow("WF-unknown")).thenThrow(new WorkflowException("Unable to retrieve workflow instance: WF-unknown"));
         context.registerAdapter(ResourceResolver.class, WorkflowSession.class, session);
 
         context.request().addRequestParameter("workflowId", "WF-unknown");

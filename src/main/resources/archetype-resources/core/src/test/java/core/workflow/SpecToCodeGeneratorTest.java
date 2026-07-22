@@ -3,22 +3,53 @@ package ${package}.core.workflow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.junit.jupiter.MockitoExtension;
-import uk.org.lidalia.slf4jext.Level;
-import uk.org.lidalia.slf4jtest.LoggingEvent;
 import uk.org.lidalia.slf4jtest.TestLogger;
 import uk.org.lidalia.slf4jtest.TestLoggerFactory;
 
-import java.util.List;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
 class SpecToCodeGeneratorTest {
 
-    private SpecToCodeGenerator specToCodeGenerator;
+    private static final String SAMPLE_FORM_SPEC = "{\n" +
+            "  \"title\": \"Sample Registration Form\",\n" +
+            "  \"type\": \"object\",\n" +
+            "  \"properties\": {\n" +
+            "    \"firstName\": { \"type\": \"string\", \"title\": \"First Name\", \"description\": \"Enter your first name.\" },\n" +
+            "    \"lastName\": { \"type\": \"string\", \"title\": \"Last Name\", \"description\": \"Enter your last name.\" },\n" +
+            "    \"email\": { \"type\": \"string\", \"format\": \"email\", \"title\": \"Email Address\", \"description\": \"Enter a valid email address.\" }\n" +
+            "  },\n" +
+            "  \"required\": [\"firstName\", \"lastName\", \"email\"]\n" +
+            "}\n";
 
-    private TestLogger logger = TestLoggerFactory.getTestLogger(SpecToCodeGenerator.class);
+    // The actual specs/card-component.json shipped by this archetype — this is
+    // the spec that the hand-written Card.java/card.html were built from, so it
+    // doubles as a golden reference: generated output should line up with them.
+    private static final String CARD_COMPONENT_SPEC = "{\n" +
+            "  \"title\": \"Card Component\",\n" +
+            "  \"type\": \"object\",\n" +
+            "  \"properties\": {\n" +
+            "    \"cardTitle\": { \"type\": \"string\", \"title\": \"Card Title\", \"description\": \"The main heading for the card.\" },\n" +
+            "    \"cardText\": { \"type\": \"string\", \"title\": \"Card Text\", \"description\": \"The descriptive body text for the card.\" },\n" +
+            "    \"imagePath\": { \"type\": \"string\", \"title\": \"Image Path\", \"description\": \"The path to the card's image in the DAM.\" },\n" +
+            "    \"buttonText\": { \"type\": \"string\", \"title\": \"Button Text\", \"description\": \"The text for the card's call-to-action button.\" },\n" +
+            "    \"buttonLink\": { \"type\": \"string\", \"title\": \"Button Link\", \"description\": \"The destination URL for the call-to-action button.\" }\n" +
+            "  },\n" +
+            "  \"required\": [\"cardTitle\", \"cardText\"]\n" +
+            "}\n";
+
+    private SpecToCodeGenerator specToCodeGenerator;
+    private final TestLogger logger = TestLoggerFactory.getTestLogger(SpecToCodeGenerator.class);
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -26,105 +57,145 @@ class SpecToCodeGeneratorTest {
         specToCodeGenerator = new SpecToCodeGenerator();
     }
 
-    @Test
-    void testGenerateLogsSpecPath() {
-        String specPath = "/content/specs/form-spec.json";
-        String outputPath = "/apps/generated/components";
-
-        specToCodeGenerator.generate(specPath, outputPath);
-
-        List<LoggingEvent> events = logger.getLoggingEvents();
-        assertTrue(events.size() >= 1, "Should have log events");
-
-        boolean hasSpecPathLog = events.stream()
-            .anyMatch(e -> e.getMessage().contains("Invoking Spec-to-Code Generator") &&
-                          e.getArguments().toString().contains(specPath));
-        assertTrue(hasSpecPathLog, "Should log the spec path");
+    private Path writeSpec(String name, String content) throws IOException {
+        Path spec = tempDir.resolve(name);
+        Files.write(spec, content.getBytes(StandardCharsets.UTF_8));
+        return spec;
     }
 
     @Test
-    void testGenerateLogsOutputPath() {
-        String specPath = "/content/specs/component-spec.json";
-        String outputPath = "/apps/myproject/components/newcomponent";
+    void testGenerateCreatesSlingModelWithFieldsAndGetters() throws IOException {
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
 
-        specToCodeGenerator.generate(specPath, outputPath);
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
 
-        List<LoggingEvent> events = logger.getLoggingEvents();
-
-        boolean hasOutputPathLog = events.stream()
-            .anyMatch(e -> e.getArguments().toString().contains(outputPath));
-        assertTrue(hasOutputPathLog, "Should log the output path");
+        Path modelFile = tempDir.resolve("core/src/main/java/com/acme/core/models/SampleRegistrationForm.java");
+        assertTrue(Files.exists(modelFile), "Sling Model should be generated");
+        String src = Files.readString(modelFile);
+        assertTrue(src.contains("package com.acme.core.models;"));
+        assertTrue(src.contains("public class SampleRegistrationForm"));
+        assertTrue(src.contains("@Model(adaptables = SlingHttpServletRequest.class,"));
+        assertTrue(src.contains("private String firstName;"));
+        assertTrue(src.contains("private String lastName;"));
+        assertTrue(src.contains("private String email;"));
+        assertTrue(src.contains("public String getFirstName() {"));
+        assertTrue(src.contains("return firstName;"));
     }
 
     @Test
-    void testGenerateLogsCompletionMessage() {
-        String specPath = "/content/specs/test-spec.json";
-        String outputPath = "/apps/test/output";
+    void testGenerateMapsJsonSchemaTypesToJavaTypes() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Mixed Types\",\n" +
+                "  \"properties\": {\n" +
+                "    \"label\": { \"type\": \"string\", \"title\": \"Label\" },\n" +
+                "    \"isActive\": { \"type\": \"boolean\", \"title\": \"Active\" },\n" +
+                "    \"count\": { \"type\": \"integer\", \"title\": \"Count\" },\n" +
+                "    \"price\": { \"type\": \"number\", \"title\": \"Price\" }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("mixed-types.json", spec);
 
-        specToCodeGenerator.generate(specPath, outputPath);
+        specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp");
 
-        List<LoggingEvent> events = logger.getLoggingEvents();
+        String src = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/MixedTypes.java"));
+        assertTrue(src.contains("private String label;"));
+        assertTrue(src.contains("private Boolean isActive;"));
+        assertTrue(src.contains("private Long count;"));
+        assertTrue(src.contains("private Double price;"));
+        assertTrue(src.contains("public Boolean getIsActive() {"));
+    }
 
-        boolean hasCompletionLog = events.stream()
-            .anyMatch(e -> e.getMessage().contains("Spec-to-Code Generation completed for:"));
+    @Test
+    void testGenerateCreatesAemComponentContentXmlAndHtl() throws IOException {
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        Path componentDir = tempDir.resolve(
+                "ui.apps/src/main/content/jcr_root/apps/AcmeApp/components/generated/sample-registration-form");
+        Path contentXml = componentDir.resolve(".content.xml");
+        Path htl = componentDir.resolve("sample-registration-form.html");
+        assertTrue(Files.exists(contentXml), "content.xml should be generated");
+        assertTrue(Files.exists(htl), "HTL script should be generated");
+
+        String xml = Files.readString(contentXml);
+        assertTrue(xml.contains("jcr:primaryType=\"cq:Component\""));
+        assertTrue(xml.contains("jcr:title=\"Sample Registration Form\""));
+        assertTrue(xml.contains("componentGroup=\"AEM Forms BMAD - AcmeApp - Generated\""));
+
+        String html = Files.readString(htl);
+        assertTrue(html.contains("data-sly-use.model=\"com.acme.core.models.SampleRegistrationForm\""));
+        assertTrue(html.contains("${model.firstName}"));
+        assertTrue(html.contains("${model.lastName}"));
+        assertTrue(html.contains("${model.email}"));
+    }
+
+    @Test
+    void testGenerateCreatesReactComponent() throws IOException {
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        Path reactFile = tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/SampleRegistrationForm.jsx");
+        assertTrue(Files.exists(reactFile), "React component should be generated");
+        String jsx = Files.readString(reactFile);
+        assertTrue(jsx.contains("import { Field } from '@aemforms/af-react-components';"));
+        assertTrue(jsx.contains("const SampleRegistrationForm ="));
+        assertTrue(jsx.contains("name={`${name}.firstName`}"));
+        assertTrue(jsx.contains("name={`${name}.email`}"));
+        assertTrue(jsx.contains("export default function (props)"));
+    }
+
+    @Test
+    void testGenerateWithCardComponentSpecMatchesHandWrittenReference() throws IOException {
+        // specs/card-component.json is the real spec this archetype ships, and
+        // Card.java/card.html were hand-written to match it. A generator that
+        // actually implements the spec should reproduce the same field set.
+        Path spec = writeSpec("card-component.json", CARD_COMPONENT_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        // "Card Component" -> "Card" (trailing "Component" is stripped, matching
+        // the hand-written Card.java's class name)
+        Path modelFile = tempDir.resolve("core/src/main/java/com/acme/core/models/Card.java");
+        assertTrue(Files.exists(modelFile), "Should generate Card.java, matching the hand-written model's name");
+        String src = Files.readString(modelFile);
+        for (String field : new String[]{"cardTitle", "cardText", "imagePath", "buttonText", "buttonLink"}) {
+            assertTrue(src.contains("private String " + field + ";"), "Missing field: " + field);
+            assertTrue(src.contains("public String get" + Character.toUpperCase(field.charAt(0)) + field.substring(1) + "() {"),
+                    "Missing getter for: " + field);
+        }
+
+        Path componentDir = tempDir.resolve(
+                "ui.apps/src/main/content/jcr_root/apps/AcmeApp/components/generated/card");
+        assertTrue(Files.exists(componentDir.resolve(".content.xml")));
+        assertTrue(Files.exists(componentDir.resolve("card.html")));
+    }
+
+    @Test
+    void testGenerateThrowsForMissingSpecFile() {
+        Path missing = tempDir.resolve("does-not-exist.json");
+        assertThrows(IOException.class,
+                () -> specToCodeGenerator.generate(missing.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+    }
+
+    @Test
+    void testGenerateThrowsForSpecWithNoProperties() throws IOException {
+        Path spec = writeSpec("empty.json", "{ \"title\": \"Empty\" }");
+        IOException ex = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+        assertTrue(ex.getMessage().contains("no 'properties'"));
+    }
+
+    @Test
+    void testGenerateLogsCompletionMessage() throws IOException {
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        boolean hasCompletionLog = logger.getLoggingEvents().stream()
+                .anyMatch(e -> e.getMessage().contains("Spec-to-Code Generation completed for:"));
         assertTrue(hasCompletionLog, "Should log completion message");
-    }
-
-    @Test
-    void testGenerateWithEmptyPaths() {
-        specToCodeGenerator.generate("", "");
-
-        List<LoggingEvent> events = logger.getLoggingEvents();
-        assertEquals(2, events.size(), "Should have two log events (start and completion)");
-    }
-
-    @Test
-    void testGenerateWithNullPaths() {
-        // Should handle null paths gracefully (logging them as null)
-        assertDoesNotThrow(() -> specToCodeGenerator.generate(null, null));
-
-        List<LoggingEvent> events = logger.getLoggingEvents();
-        assertTrue(events.size() >= 1, "Should still log events even with null paths");
-    }
-
-    @Test
-    void testGenerateLogsAtInfoLevel() {
-        specToCodeGenerator.generate("/spec/path", "/output/path");
-
-        List<LoggingEvent> events = logger.getLoggingEvents();
-
-        boolean allInfoLevel = events.stream()
-            .allMatch(e -> e.getLevel() == Level.INFO);
-        assertTrue(allInfoLevel, "All log messages should be at INFO level");
-    }
-
-    @Test
-    void testGenerateWithSpecialCharactersInPath() {
-        String specPath = "/content/specs/form-spec (1).json";
-        String outputPath = "/apps/my-project/components/new_component";
-
-        assertDoesNotThrow(() -> specToCodeGenerator.generate(specPath, outputPath));
-
-        List<LoggingEvent> events = logger.getLoggingEvents();
-        assertTrue(events.size() >= 1);
-    }
-
-    @Test
-    void testGenerateWithLongPaths() {
-        String specPath = "/content/" + "nested/".repeat(20) + "spec.json";
-        String outputPath = "/apps/" + "deep/".repeat(20) + "component";
-
-        assertDoesNotThrow(() -> specToCodeGenerator.generate(specPath, outputPath));
-    }
-
-    @Test
-    void testGenerateMultipleTimes() {
-        specToCodeGenerator.generate("/spec1", "/output1");
-        specToCodeGenerator.generate("/spec2", "/output2");
-        specToCodeGenerator.generate("/spec3", "/output3");
-
-        List<LoggingEvent> events = logger.getLoggingEvents();
-        // Each generate call should produce 2 log events (start + completion)
-        assertEquals(6, events.size(), "Should have 6 log events for 3 generate calls");
     }
 }

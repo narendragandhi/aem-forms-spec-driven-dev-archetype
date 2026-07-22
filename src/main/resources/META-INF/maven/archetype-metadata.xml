@@ -74,13 +74,33 @@
             </excludes>
         </fileSet>
 
-        <!-- Unfiltered files (HTL, CSS, JS, Binary) -->
+        <!-- Unfiltered files (HTL, CSS, JS, Binary).
+
+             Includes *.json, plus the extensionless names 'file',
+             'original', and 'swaggerFile': FileVault serializes an
+             nt:file/nt:resource node with extra properties (mixins, a
+             DAM rendition, an Image widget's uploaded asset, etc.) as
+             '<name>.dir/.content.xml' (metadata) next to a sibling data
+             file named after the JCR node itself — which for AEM's Image
+             widget and DAM original renditions is literally 'file' or
+             'original', with no extension at all. An extension-based
+             include list can never match those by construction; without
+             an explicit name-based include, the .content.xml ships (it's
+             *.xml, covered by the global filtered fileset above) but its
+             binary sibling silently doesn't. That combination passes
+             package build/validation — filevault doesn't cross-check a
+             docview's jcr:data="{Binary}" placeholder against a sibling
+             file's existence at build time — and only fails at real JCR
+             import, with Oak rejecting the nt:resource node for missing
+             its mandatory jcr:data property. Found via an actual deploy
+             to a real AEM instance, not from a build/test failure. -->
         <fileSet filtered="false">
             <directory>ui.apps</directory>
             <includes>
                 <include>**/*.html</include>
                 <include>**/*.js</include>
                 <include>**/*.css</include>
+                <include>**/*.json</include>
                 <include>**/*.txt</include>
                 <include>**/*.png</include>
                 <include>**/*.ico</include>
@@ -89,6 +109,9 @@
                 <include>**/*.ttf</include>
                 <include>**/*.otf</include>
                 <include>**/*.eot</include>
+                <include>**/file</include>
+                <include>**/original</include>
+                <include>**/swaggerFile</include>
             </includes>
         </fileSet>
         <fileSet filtered="false">
@@ -99,6 +122,10 @@
                 <include>**/*.jpeg</include>
                 <include>**/*.gif</include>
                 <include>**/*.svg</include>
+                <include>**/*.json</include>
+                <include>**/file</include>
+                <include>**/original</include>
+                <include>**/swaggerFile</include>
             </includes>
         </fileSet>
         <fileSet filtered="false">
