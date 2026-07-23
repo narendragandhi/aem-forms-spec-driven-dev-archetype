@@ -37,6 +37,31 @@ import java.util.Set;
  * HTML5 constraints alone aren't real validation, so the generated Sling
  * Model also gets a {@code validate()} method that re-checks the same
  * constraints server-side.
+ *
+ * <p>Also understands three extensions beyond flat scalar fields, each
+ * scoped to one level (a nested object's own properties must be scalar; an
+ * array's object items must have scalar properties — no object-in-object,
+ * no array-in-array):
+ * <ul>
+ *   <li>{@code "type": "object"} with its own {@code "properties"} — a
+ *       nested field group, generated as a separate child Sling Model
+ *       ({@code @ChildResource}), inlined as an HTL/React fieldset.</li>
+ *   <li>{@code "type": "array"} with {@code "items"} — a repeatable field.
+ *       On the Sling Model / HTL side (WCM dialog-authored components) this
+ *       is real JCR-backed repetition ({@code @ChildResource List<X>},
+ *       {@code data-sly-list}). On the React side, repetition in real
+ *       Adaptive Forms is a panel/form-model concern handled by the
+ *       renderer (see {@code @aemforms/af-react-renderer}'s
+ *       {@code renderChildren}) — a field component's own code is
+ *       identical whether it's repeated or not. So this generates a
+ *       standalone single-item field (or field-group) component, meant to
+ *       be registered in {@code App.jsx}'s {@code customMappings} and
+ *       placed inside a form-author-configured repeatable panel; it does
+ *       not contain any add/remove logic itself.</li>
+ *   <li>{@code "visibleWhen": {"field": "...", "equals": "..."}} on a
+ *       scalar field — simple equality-based conditional visibility against
+ *       a sibling top-level scalar field.</li>
+ * </ul>
  */
 @Component(service = SpecToCodeGenerator.class)
 public class SpecToCodeGenerator {
@@ -75,10 +100,11 @@ public class SpecToCodeGenerator {
 
         String specFileName = spec.getFileName().toString();
         String title = root.hasNonNull("title") ? root.get("title").asText() : specFileName;
-        List<SpecField> fields = readFields(root);
+        List<SpecField> fields = readFields(root.get("properties"), requiredNames(root), "");
         if (fields.isEmpty()) {
             throw new IOException("Spec has no 'properties' to generate from: " + specPath);
         }
+        validateVisibleWhen(fields, specPath);
 
         String name = toComponentName(title);
         String slug = toKebabCase(name);
@@ -86,27 +112,85 @@ public class SpecToCodeGenerator {
 
         Path modelFile = writeSlingModel(out, basePackage, name, specFileName, fields);
         Path componentDir = writeAemComponent(out, appName, basePackage, name, slug, title, specFileName, fields);
-        Path reactFile = writeReactComponent(out, name, slug, specFileName, fields);
+        List<Path> reactFiles = writeReactComponents(out, name, slug, specFileName, fields);
 
         LOG.info("Generated Sling Model: {}", modelFile);
         LOG.info("Generated AEM component: {}", componentDir);
-        LOG.info("Generated React component: {}", reactFile);
+        for (Path reactFile : reactFiles) {
+            LOG.info("Generated React component: {}", reactFile);
+        }
         LOG.info("Spec-to-Code Generation completed for: {}", specPath);
     }
 
-    private List<SpecField> readFields(JsonNode root) {
-        List<SpecField> fields = new ArrayList<>();
-        JsonNode properties = root.get("properties");
-        if (properties == null || !properties.isObject()) {
-            return fields;
-        }
+    // --- spec parsing -------------------------------------------------------
 
+    private enum FieldKind { SCALAR, OBJECT, ARRAY_SCALAR, ARRAY_OBJECT }
+
+    private static final class Constraints {
+        String format;
+        Integer minLength;
+        Integer maxLength;
+        String pattern;
+        Double minimum;
+        Double maximum;
+        List<String> enumValues = new ArrayList<>();
+    }
+
+    private static final class VisibleWhen {
+        final String field;
+        final String equalsValue;
+
+        VisibleWhen(String field, String equalsValue) {
+            this.field = field;
+            this.equalsValue = equalsValue;
+        }
+    }
+
+    private static final class SpecField {
+        final String name;
+        final String title;
+        final String description;
+        final boolean required;
+        final FieldKind kind;
+        final String javaType;          // scalar type, or array item's scalar type for ARRAY_SCALAR
+        final Constraints constraints;  // applies to SCALAR and ARRAY_SCALAR (per-item)
+        final VisibleWhen visibleWhen;  // nullable; SCALAR only
+        final List<SpecField> children; // non-null (possibly empty) only for OBJECT / ARRAY_OBJECT
+        final String childModelName;    // e.g. "MailingAddress", "Dependent" — set for OBJECT / ARRAY_OBJECT
+
+        SpecField(String name, String title, String description, boolean required, FieldKind kind,
+                String javaType, Constraints constraints, VisibleWhen visibleWhen,
+                List<SpecField> children, String childModelName) {
+            this.name = name;
+            this.title = title;
+            this.description = description;
+            this.required = required;
+            this.kind = kind;
+            this.javaType = javaType;
+            this.constraints = constraints;
+            this.visibleWhen = visibleWhen;
+            this.children = children;
+            this.childModelName = childModelName;
+        }
+    }
+
+    private Set<String> requiredNames(JsonNode node) {
         Set<String> required = new HashSet<>();
-        JsonNode requiredNode = root.get("required");
+        JsonNode requiredNode = node.get("required");
         if (requiredNode != null && requiredNode.isArray()) {
             for (JsonNode r : requiredNode) {
                 required.add(r.asText());
             }
+        }
+        return required;
+    }
+
+    // pathPrefix is used only to make nesting-limit-violation error messages
+    // point at the actual offending field (e.g. "address.subAddress").
+    private List<SpecField> readFields(JsonNode properties, Set<String> required, String pathPrefix) throws IOException {
+        List<SpecField> fields = new ArrayList<>();
+        if (properties == null || !properties.isObject()) {
+            return fields;
         }
 
         Iterator<Map.Entry<String, JsonNode>> it = properties.fields();
@@ -114,29 +198,112 @@ public class SpecToCodeGenerator {
             Map.Entry<String, JsonNode> entry = it.next();
             String propName = entry.getKey();
             JsonNode def = entry.getValue();
-
+            String path = pathPrefix.isEmpty() ? propName : pathPrefix + "." + propName;
             String jsonType = def.hasNonNull("type") ? def.get("type").asText() : "string";
             String fieldTitle = def.hasNonNull("title") ? def.get("title").asText() : propName;
             String description = def.hasNonNull("description") ? def.get("description").asText() : "";
-            String format = def.hasNonNull("format") ? def.get("format").asText() : null;
-            Integer minLength = def.hasNonNull("minLength") ? def.get("minLength").asInt() : null;
-            Integer maxLength = def.hasNonNull("maxLength") ? def.get("maxLength").asInt() : null;
-            String pattern = def.hasNonNull("pattern") ? def.get("pattern").asText() : null;
-            Double minimum = def.hasNonNull("minimum") ? def.get("minimum").asDouble() : null;
-            Double maximum = def.hasNonNull("maximum") ? def.get("maximum").asDouble() : null;
+            boolean isRequired = required.contains(propName);
 
-            List<String> enumValues = new ArrayList<>();
-            JsonNode enumNode = def.get("enum");
-            if (enumNode != null && enumNode.isArray()) {
-                for (JsonNode e : enumNode) {
-                    enumValues.add(e.asText());
+            if ("object".equals(jsonType)) {
+                List<SpecField> children = readFields(def.get("properties"), requiredNames(def), path);
+                rejectNestedContainers(children, path);
+                String childModelName = toComponentName(fieldTitle);
+                fields.add(new SpecField(propName, fieldTitle, description, isRequired, FieldKind.OBJECT,
+                        null, null, null, children, childModelName));
+
+            } else if ("array".equals(jsonType)) {
+                JsonNode items = def.get("items");
+                String itemJsonType = items != null && items.hasNonNull("type") ? items.get("type").asText() : "string";
+                String itemTitle = def.hasNonNull("itemTitle") ? def.get("itemTitle").asText() : fieldTitle;
+
+                if (items != null && "object".equals(itemJsonType)) {
+                    List<SpecField> children = readFields(items.get("properties"), requiredNames(items), path + "[]");
+                    rejectNestedContainers(children, path + "[]");
+                    String childModelName = toComponentName(itemTitle);
+                    fields.add(new SpecField(propName, fieldTitle, description, isRequired, FieldKind.ARRAY_OBJECT,
+                            null, null, null, children, childModelName));
+                } else {
+                    Constraints c = items != null ? readConstraints(items) : new Constraints();
+                    SpecField itemField = new SpecField(propName, itemTitle, "", false, FieldKind.SCALAR,
+                            javaType(itemJsonType), c, null, null, null);
+                    fields.add(new SpecField(propName, fieldTitle, description, isRequired, FieldKind.ARRAY_SCALAR,
+                            javaType(itemJsonType), c, null, List.of(itemField), null));
                 }
-            }
 
-            fields.add(new SpecField(propName, javaType(jsonType), fieldTitle, description,
-                    required.contains(propName), format, minLength, maxLength, pattern, minimum, maximum, enumValues));
+            } else {
+                Constraints c = readConstraints(def);
+                VisibleWhen vw = readVisibleWhen(def);
+                fields.add(new SpecField(propName, fieldTitle, description, isRequired, FieldKind.SCALAR,
+                        javaType(jsonType), c, vw, null, null));
+            }
         }
         return fields;
+    }
+
+    // Enforces the one-level nesting limit: a nested object's (or array
+    // item's) own fields must all be scalar. Rejecting loudly here beats
+    // silently mis-generating a spec that goes deeper than this generator
+    // actually supports.
+    private void rejectNestedContainers(List<SpecField> children, String path) throws IOException {
+        for (SpecField child : children) {
+            if (child.kind != FieldKind.SCALAR) {
+                throw new IOException("Field '" + path + "." + child.name
+                        + "' exceeds the one-level nesting limit this generator supports "
+                        + "(nested objects/arrays may only contain scalar fields)");
+            }
+        }
+    }
+
+    private Constraints readConstraints(JsonNode def) {
+        Constraints c = new Constraints();
+        c.format = def.hasNonNull("format") ? def.get("format").asText() : null;
+        c.minLength = def.hasNonNull("minLength") ? def.get("minLength").asInt() : null;
+        c.maxLength = def.hasNonNull("maxLength") ? def.get("maxLength").asInt() : null;
+        c.pattern = def.hasNonNull("pattern") ? def.get("pattern").asText() : null;
+        c.minimum = def.hasNonNull("minimum") ? def.get("minimum").asDouble() : null;
+        c.maximum = def.hasNonNull("maximum") ? def.get("maximum").asDouble() : null;
+        JsonNode enumNode = def.get("enum");
+        if (enumNode != null && enumNode.isArray()) {
+            for (JsonNode e : enumNode) {
+                c.enumValues.add(e.asText());
+            }
+        }
+        return c;
+    }
+
+    private VisibleWhen readVisibleWhen(JsonNode def) {
+        JsonNode vw = def.get("visibleWhen");
+        if (vw == null || !vw.hasNonNull("field") || !vw.hasNonNull("equals")) {
+            return null;
+        }
+        return new VisibleWhen(vw.get("field").asText(), vw.get("equals").asText());
+    }
+
+    // Fails fast on a visibleWhen that can never resolve correctly: an
+    // unknown sibling, a non-scalar sibling, or a field referencing itself.
+    private void validateVisibleWhen(List<SpecField> topLevelFields, String specPath) throws IOException {
+        Map<String, SpecField> byName = new java.util.HashMap<>();
+        for (SpecField f : topLevelFields) {
+            byName.put(f.name, f);
+        }
+        for (SpecField f : topLevelFields) {
+            if (f.visibleWhen == null) {
+                continue;
+            }
+            String refName = f.visibleWhen.field;
+            if (refName.equals(f.name)) {
+                throw new IOException("Field '" + f.name + "' in " + specPath + " has visibleWhen referencing itself");
+            }
+            SpecField target = byName.get(refName);
+            if (target == null) {
+                throw new IOException("Field '" + f.name + "' in " + specPath
+                        + " has visibleWhen referencing unknown field '" + refName + "'");
+            }
+            if (target.kind != FieldKind.SCALAR) {
+                throw new IOException("Field '" + f.name + "' in " + specPath
+                        + " has visibleWhen referencing non-scalar field '" + refName + "'");
+            }
+        }
     }
 
     private String javaType(String jsonType) {
@@ -152,18 +319,19 @@ public class SpecToCodeGenerator {
         }
     }
 
-    // Maps a spec field to the HTML5 input type its React input should use.
+    // Maps a field to the HTML5 input type its React input should use.
     // Numeric fields always render as "number" regardless of a declared
     // format, since that's what makes minimum/maximum meaningful in the
     // browser. Fields with an enum are handled separately as a <select>.
-    private String htmlInputType(SpecField f) {
-        if ("Long".equals(f.javaType) || "Double".equals(f.javaType)) {
+    private String htmlInputType(String javaType, Constraints c) {
+        if ("Long".equals(javaType) || "Double".equals(javaType)) {
             return "number";
         }
-        if (f.format == null) {
+        String format = c != null ? c.format : null;
+        if (format == null) {
             return "text";
         }
-        switch (f.format) {
+        switch (format) {
             case "email":
                 return "email";
             case "date":
@@ -213,30 +381,47 @@ public class SpecToCodeGenerator {
     // --- Sling Model --------------------------------------------------------
 
     private Path writeSlingModel(Path out, String basePackage, String name, String specFileName, List<SpecField> fields) throws IOException {
+        // Nested objects and array-of-object fields need their own child
+        // Sling Model file, adapted from the child Resource directly (not
+        // from the request — ChildResourceInjector adapts the child
+        // Resource itself via ModelFactory).
+        for (SpecField f : fields) {
+            if (f.kind == FieldKind.OBJECT || f.kind == FieldKind.ARRAY_OBJECT) {
+                writeModelFile(out, basePackage, f.childModelName, specFileName, f.children, true);
+            }
+        }
+        return writeModelFile(out, basePackage, name, specFileName, fields, false);
+    }
+
+    private Path writeModelFile(Path out, String basePackage, String name, String specFileName,
+            List<SpecField> fields, boolean isChildModel) throws IOException {
         StringBuilder src = new StringBuilder();
         src.append("package ").append(basePackage).append(".core.models;\n\n");
-        src.append("import org.apache.sling.api.SlingHttpServletRequest;\n");
+        if (isChildModel) {
+            src.append("import org.apache.sling.api.resource.Resource;\n");
+        } else {
+            src.append("import org.apache.sling.api.SlingHttpServletRequest;\n");
+        }
         src.append("import org.apache.sling.models.annotations.DefaultInjectionStrategy;\n");
         src.append("import org.apache.sling.models.annotations.Model;\n");
+        src.append("import org.apache.sling.models.annotations.injectorspecific.ChildResource;\n");
         src.append("import org.apache.sling.models.annotations.injectorspecific.ValueMapValue;\n\n");
         src.append("import java.util.ArrayList;\n");
         src.append("import java.util.Arrays;\n");
+        src.append("import java.util.Collections;\n");
         src.append("import java.util.List;\n\n");
         src.append("/**\n");
         src.append(" * Generated by SpecToCodeGenerator from ").append(specFileName).append(".\n");
         src.append(" * Regenerate from the spec instead of hand-editing this file.\n");
         src.append(" */\n");
-        src.append("@Model(adaptables = SlingHttpServletRequest.class,\n");
+        src.append("@Model(adaptables = ").append(isChildModel ? "Resource.class" : "SlingHttpServletRequest.class").append(",\n");
         src.append("       defaultInjectionStrategy = DefaultInjectionStrategy.OPTIONAL)\n");
         src.append("public class ").append(name).append(" {\n\n");
         for (SpecField f : fields) {
-            src.append("    @ValueMapValue\n");
-            src.append("    private ").append(f.javaType).append(' ').append(f.name).append(";\n\n");
+            appendFieldDeclaration(src, f);
         }
         for (SpecField f : fields) {
-            src.append("    public ").append(f.javaType).append(" get").append(capitalize(f.name)).append("() {\n");
-            src.append("        return ").append(f.name).append(";\n");
-            src.append("    }\n\n");
+            appendGetter(src, f);
         }
         appendValidateMethod(src, fields);
         src.append("}\n");
@@ -248,11 +433,56 @@ public class SpecToCodeGenerator {
         return modelFile;
     }
 
-    // Client-side HTML5 constraints (below) are a UX convenience, not
-    // enforcement — anyone can submit past them with a direct POST. This
-    // re-checks the same spec constraints server-side so callers (e.g. a
-    // form submission servlet) have something real to call before trusting
-    // the data.
+    private void appendFieldDeclaration(StringBuilder src, SpecField f) {
+        switch (f.kind) {
+            case SCALAR:
+                src.append("    @ValueMapValue\n");
+                src.append("    private ").append(f.javaType).append(' ').append(f.name).append(";\n\n");
+                break;
+            case OBJECT:
+                src.append("    @ChildResource\n");
+                src.append("    private ").append(f.childModelName).append(' ').append(f.name).append(";\n\n");
+                break;
+            case ARRAY_SCALAR:
+                src.append("    @ValueMapValue\n");
+                src.append("    private ").append(f.javaType).append("[] ").append(f.name).append(";\n\n");
+                break;
+            case ARRAY_OBJECT:
+                src.append("    @ChildResource\n");
+                src.append("    private List<").append(f.childModelName).append("> ").append(f.name).append(";\n\n");
+                break;
+        }
+    }
+
+    private void appendGetter(StringBuilder src, SpecField f) {
+        String cap = capitalize(f.name);
+        switch (f.kind) {
+            case SCALAR:
+                src.append("    public ").append(f.javaType).append(" get").append(cap).append("() {\n");
+                src.append("        return ").append(f.name).append(";\n    }\n\n");
+                break;
+            case OBJECT:
+                src.append("    public ").append(f.childModelName).append(" get").append(cap).append("() {\n");
+                src.append("        return ").append(f.name).append(";\n    }\n\n");
+                break;
+            case ARRAY_SCALAR:
+                src.append("    public ").append(f.javaType).append("[] get").append(cap).append("() {\n");
+                src.append("        return ").append(f.name).append(";\n    }\n\n");
+                break;
+            case ARRAY_OBJECT:
+                // @ChildResource yields null (not an empty list) when the
+                // child resource doesn't exist yet — null-safe so callers
+                // (validate(), HTL's data-sly-list) don't need to guard it.
+                src.append("    public List<").append(f.childModelName).append("> get").append(cap).append("() {\n");
+                src.append("        return ").append(f.name).append(" != null ? ").append(f.name).append(" : Collections.emptyList();\n    }\n\n");
+                break;
+        }
+    }
+
+    // Client-side HTML5 constraints are a UX convenience, not enforcement —
+    // anyone can submit past them with a direct POST. This re-checks the
+    // same spec constraints server-side so callers (e.g. a form submission
+    // servlet) have something real to call before trusting the data.
     private void appendValidateMethod(StringBuilder src, List<SpecField> fields) {
         src.append("    /**\n");
         src.append("     * Re-checks this model's fields against the constraints declared in the\n");
@@ -261,59 +491,144 @@ public class SpecToCodeGenerator {
         src.append("    public List<String> validate() {\n");
         src.append("        List<String> errors = new ArrayList<>();\n");
         for (SpecField f : fields) {
-            String getter = "get" + capitalize(f.name) + "()";
-            boolean isString = "String".equals(f.javaType);
-            boolean isNumeric = "Long".equals(f.javaType) || "Double".equals(f.javaType);
-
-            if (f.required) {
-                if (isString) {
-                    src.append("        if (").append(getter).append(" == null || ").append(getter).append(".isEmpty()) {\n");
-                } else {
-                    src.append("        if (").append(getter).append(" == null) {\n");
-                }
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" is required\");\n");
-                src.append("        }\n");
-            }
-            if (isString && f.minLength != null) {
-                src.append("        if (").append(getter).append(" != null && ").append(getter).append(".length() < ").append(f.minLength).append(") {\n");
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" must be at least ").append(f.minLength).append(" characters\");\n");
-                src.append("        }\n");
-            }
-            if (isString && f.maxLength != null) {
-                src.append("        if (").append(getter).append(" != null && ").append(getter).append(".length() > ").append(f.maxLength).append(") {\n");
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" must be at most ").append(f.maxLength).append(" characters\");\n");
-                src.append("        }\n");
-            }
-            if (isString && f.pattern != null) {
-                src.append("        if (").append(getter).append(" != null && !").append(getter).append(".matches(\"").append(javaEscape(f.pattern)).append("\")) {\n");
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" is not in a valid format\");\n");
-                src.append("        }\n");
-            }
-            if (isNumeric && f.minimum != null) {
-                src.append("        if (").append(getter).append(" != null && ").append(getter).append(" < ").append(f.minimum).append(") {\n");
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" must be at least ").append(f.minimum).append("\");\n");
-                src.append("        }\n");
-            }
-            if (isNumeric && f.maximum != null) {
-                src.append("        if (").append(getter).append(" != null && ").append(getter).append(" > ").append(f.maximum).append(") {\n");
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" must be at most ").append(f.maximum).append("\");\n");
-                src.append("        }\n");
-            }
-            if (isString && !f.enumValues.isEmpty()) {
-                StringBuilder literal = new StringBuilder();
-                for (int i = 0; i < f.enumValues.size(); i++) {
-                    if (i > 0) {
-                        literal.append(", ");
-                    }
-                    literal.append('"').append(javaEscape(f.enumValues.get(i))).append('"');
-                }
-                src.append("        if (").append(getter).append(" != null && !Arrays.asList(").append(literal).append(").contains(").append(getter).append(")) {\n");
-                src.append("            errors.add(\"").append(jsonEscape(f.title)).append(" must be one of: ").append(jsonEscape(String.join(", ", f.enumValues))).append("\");\n");
-                src.append("        }\n");
-            }
+            appendFieldValidation(src, f, "        ");
         }
         src.append("        return errors;\n");
         src.append("    }\n\n");
+    }
+
+    private void appendFieldValidation(StringBuilder src, SpecField f, String indent) {
+        String getter = "get" + capitalize(f.name) + "()";
+        boolean guarded = f.visibleWhen != null;
+        String innerIndent = guarded ? indent + "    " : indent;
+
+        if (guarded) {
+            src.append(indent).append("if (").append(vwJavaCondition(f.visibleWhen)).append(") {\n");
+        }
+
+        switch (f.kind) {
+            case SCALAR:
+                appendScalarValidation(src, getter, f.required, f.title, f.javaType, f.constraints, innerIndent);
+                break;
+            case OBJECT:
+                src.append(innerIndent).append("if (").append(getter).append(" == null) {\n");
+                if (f.required) {
+                    src.append(innerIndent).append("    errors.add(\"").append(jsonEscape(f.title)).append(" is required\");\n");
+                }
+                src.append(innerIndent).append("} else {\n");
+                src.append(innerIndent).append("    for (String e : ").append(getter).append(".validate()) {\n");
+                src.append(innerIndent).append("        errors.add(\"").append(jsonEscape(f.title)).append(": \" + e);\n");
+                src.append(innerIndent).append("    }\n");
+                src.append(innerIndent).append("}\n");
+                break;
+            case ARRAY_SCALAR: {
+                String loopVar = f.name + "Item";
+                src.append(innerIndent).append("if (").append(getter).append(" == null || ").append(getter).append(".length == 0) {\n");
+                if (f.required) {
+                    src.append(innerIndent).append("    errors.add(\"").append(jsonEscape(f.title)).append(" is required\");\n");
+                }
+                src.append(innerIndent).append("} else {\n");
+                src.append(innerIndent).append("    for (").append(f.javaType).append(' ').append(loopVar).append(" : ").append(getter).append(") {\n");
+                appendScalarConstraintChecks(src, loopVar, false, f.title, f.javaType, f.constraints, innerIndent + "        ");
+                src.append(innerIndent).append("    }\n");
+                src.append(innerIndent).append("}\n");
+                break;
+            }
+            case ARRAY_OBJECT: {
+                String loopVar = f.name + "Item";
+                String idxVar = f.name + "Index";
+                src.append(innerIndent).append("if (").append(getter).append(".isEmpty()) {\n");
+                if (f.required) {
+                    src.append(innerIndent).append("    errors.add(\"").append(jsonEscape(f.title)).append(" is required\");\n");
+                }
+                src.append(innerIndent).append("} else {\n");
+                src.append(innerIndent).append("    int ").append(idxVar).append(" = 0;\n");
+                src.append(innerIndent).append("    for (").append(f.childModelName).append(' ').append(loopVar).append(" : ").append(getter).append(") {\n");
+                src.append(innerIndent).append("        for (String e : ").append(loopVar).append(".validate()) {\n");
+                src.append(innerIndent).append("            errors.add(\"").append(jsonEscape(f.title)).append("[\" + ").append(idxVar).append(" + \"]: \" + e);\n");
+                src.append(innerIndent).append("        }\n");
+                src.append(innerIndent).append("        ").append(idxVar).append("++;\n");
+                src.append(innerIndent).append("    }\n");
+                src.append(innerIndent).append("}\n");
+                break;
+            }
+        }
+
+        if (guarded) {
+            src.append(indent).append("}\n");
+        }
+    }
+
+    private void appendScalarValidation(StringBuilder src, String getter, boolean required, String title,
+            String javaType, Constraints c, String indent) {
+        boolean isString = "String".equals(javaType);
+        if (required) {
+            if (isString) {
+                src.append(indent).append("if (").append(getter).append(" == null || ").append(getter).append(".isEmpty()) {\n");
+            } else {
+                src.append(indent).append("if (").append(getter).append(" == null) {\n");
+            }
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" is required\");\n");
+            src.append(indent).append("}\n");
+        }
+        appendScalarConstraintChecks(src, getter, true, title, javaType, c, indent);
+    }
+
+    // Shared by a top-level scalar field's getter call and an array-scalar
+    // item's loop variable — same constraint checks, different value
+    // expression. nullGuard is false inside a for-each loop over a
+    // primitive-boxed array item that's already known non-null from the
+    // enclosing loop's array-not-empty check.
+    private void appendScalarConstraintChecks(StringBuilder src, String valueExpr, boolean nullGuard,
+            String title, String javaType, Constraints c, String indent) {
+        if (c == null) {
+            return;
+        }
+        boolean isString = "String".equals(javaType);
+        boolean isNumeric = "Long".equals(javaType) || "Double".equals(javaType);
+        String guard = nullGuard ? valueExpr + " != null && " : "";
+
+        if (isString && c.minLength != null) {
+            src.append(indent).append("if (").append(guard).append(valueExpr).append(".length() < ").append(c.minLength).append(") {\n");
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" must be at least ").append(c.minLength).append(" characters\");\n");
+            src.append(indent).append("}\n");
+        }
+        if (isString && c.maxLength != null) {
+            src.append(indent).append("if (").append(guard).append(valueExpr).append(".length() > ").append(c.maxLength).append(") {\n");
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" must be at most ").append(c.maxLength).append(" characters\");\n");
+            src.append(indent).append("}\n");
+        }
+        if (isString && c.pattern != null) {
+            src.append(indent).append("if (").append(guard).append('!').append(valueExpr).append(".matches(\"").append(javaEscape(c.pattern)).append("\")) {\n");
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" is not in a valid format\");\n");
+            src.append(indent).append("}\n");
+        }
+        if (isNumeric && c.minimum != null) {
+            src.append(indent).append("if (").append(guard).append(valueExpr).append(" < ").append(c.minimum).append(") {\n");
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" must be at least ").append(c.minimum).append("\");\n");
+            src.append(indent).append("}\n");
+        }
+        if (isNumeric && c.maximum != null) {
+            src.append(indent).append("if (").append(guard).append(valueExpr).append(" > ").append(c.maximum).append(") {\n");
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" must be at most ").append(c.maximum).append("\");\n");
+            src.append(indent).append("}\n");
+        }
+        if (isString && !c.enumValues.isEmpty()) {
+            StringBuilder literal = new StringBuilder();
+            for (int i = 0; i < c.enumValues.size(); i++) {
+                if (i > 0) {
+                    literal.append(", ");
+                }
+                literal.append('"').append(javaEscape(c.enumValues.get(i))).append('"');
+            }
+            src.append(indent).append("if (").append(guard).append('!').append("Arrays.asList(").append(literal).append(").contains(").append(valueExpr).append(")) {\n");
+            src.append(indent).append("    errors.add(\"").append(jsonEscape(title)).append(" must be one of: ").append(jsonEscape(String.join(", ", c.enumValues))).append("\");\n");
+            src.append(indent).append("}\n");
+        }
+    }
+
+    private String vwJavaCondition(VisibleWhen vw) {
+        return "\"" + javaEscape(vw.equalsValue) + "\".equals(get" + capitalize(vw.field) + "())";
     }
 
     // --- AEM component (content.xml + HTL) -----------------------------------
@@ -348,13 +663,7 @@ public class SpecToCodeGenerator {
         html.append("     data-sly-test.hasContent=\"").append(ref(hasContent.toString())).append("\">\n");
         html.append("    <div class=\"").append(slug).append("\">\n");
         for (SpecField f : fields) {
-            String label = xmlEscape(f.title) + (f.required ? " *" : "");
-            html.append("        <div class=\"").append(slug).append("-field\" data-sly-if=\"")
-                    .append(ref("model." + f.name)).append("\">\n");
-            html.append("            <span class=\"").append(slug).append("-field-label\">").append(label).append("</span>\n");
-            html.append("            <span class=\"").append(slug).append("-field-value\">")
-                    .append(ref("model." + f.name)).append("</span>\n");
-            html.append("        </div>\n");
+            appendHtlField(html, f, slug, "model.", "    ");
         }
         html.append("    </div>\n");
         html.append("</sly>\n");
@@ -364,14 +673,117 @@ public class SpecToCodeGenerator {
         return componentDir;
     }
 
-    // --- React component --------------------------------------------------
+    private void appendHtlField(StringBuilder html, SpecField f, String slug, String pathPrefix, String indent) {
+        String ownPath = pathPrefix + f.name;
+        switch (f.kind) {
+            case SCALAR: {
+                String condition = f.visibleWhen != null
+                        ? "model." + f.name + " && model." + f.visibleWhen.field + " == '" + htlStringEscape(f.visibleWhen.equalsValue) + "'"
+                        : ownPath;
+                String label = xmlEscape(f.title) + (f.required ? " *" : "");
+                html.append(indent).append("<div class=\"").append(slug).append("-field\" data-sly-if=\"")
+                        .append(ref(condition)).append("\">\n");
+                html.append(indent).append("    <span class=\"").append(slug).append("-field-label\">").append(label).append("</span>\n");
+                html.append(indent).append("    <span class=\"").append(slug).append("-field-value\">")
+                        .append(ref(ownPath)).append("</span>\n");
+                html.append(indent).append("</div>\n");
+                break;
+            }
+            case OBJECT:
+                html.append(indent).append("<div class=\"").append(slug).append("-field\" data-sly-if=\"")
+                        .append(ref(ownPath)).append("\">\n");
+                html.append(indent).append("    <span class=\"").append(slug).append("-field-label\">").append(xmlEscape(f.title)).append("</span>\n");
+                for (SpecField child : f.children) {
+                    appendHtlField(html, child, slug, ownPath + ".", indent + "    ");
+                }
+                html.append(indent).append("</div>\n");
+                break;
+            case ARRAY_SCALAR:
+                html.append(indent).append("<div class=\"").append(slug).append("-field\" data-sly-if=\"")
+                        .append(ref(ownPath)).append("\">\n");
+                html.append(indent).append("    <span class=\"").append(slug).append("-field-label\">").append(xmlEscape(f.title)).append("</span>\n");
+                html.append(indent).append("    <ul class=\"").append(slug).append('-').append(f.name).append("-list\" data-sly-list.item=\"")
+                        .append(ref(ownPath)).append("\">\n");
+                html.append(indent).append("        <li>").append(ref("item")).append("</li>\n");
+                html.append(indent).append("    </ul>\n");
+                html.append(indent).append("</div>\n");
+                break;
+            case ARRAY_OBJECT:
+                html.append(indent).append("<div class=\"").append(slug).append("-field\" data-sly-if=\"")
+                        .append(ref(ownPath)).append("\">\n");
+                html.append(indent).append("    <span class=\"").append(slug).append("-field-label\">").append(xmlEscape(f.title)).append("</span>\n");
+                html.append(indent).append("    <div class=\"").append(slug).append('-').append(f.name).append("-list\" data-sly-list.item=\"")
+                        .append(ref(ownPath)).append("\">\n");
+                for (SpecField child : f.children) {
+                    appendHtlField(html, child, slug, "item.", indent + "        ");
+                }
+                html.append(indent).append("    </div>\n");
+                html.append(indent).append("</div>\n");
+                break;
+        }
+    }
 
-    private Path writeReactComponent(Path out, String name, String slug, String specFileName, List<SpecField> fields) throws IOException {
+    private String htlStringEscape(String s) {
+        return s.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    // --- React component(s) --------------------------------------------------
+
+    // Returns every file written: the main component (scalar + nested-object
+    // fields inline), plus one standalone file per array field (scalar or
+    // object item) — see the class javadoc for why arrays get their own
+    // file instead of inline add/remove logic.
+    private List<Path> writeReactComponents(Path out, String name, String slug, String specFileName, List<SpecField> fields) throws IOException {
+        List<Path> written = new ArrayList<>();
+
+        List<SpecField> inlineFields = new ArrayList<>();
+        List<SpecField> arrayFields = new ArrayList<>();
+        for (SpecField f : fields) {
+            if (f.kind == FieldKind.ARRAY_SCALAR || f.kind == FieldKind.ARRAY_OBJECT) {
+                arrayFields.add(f);
+            } else {
+                inlineFields.add(f);
+            }
+        }
+
+        written.add(writeReactFieldGroup(out, name, slug, specFileName, inlineFields));
+
+        for (SpecField arrayField : arrayFields) {
+            String itemName = arrayField.kind == FieldKind.ARRAY_OBJECT
+                    ? arrayField.childModelName
+                    : toComponentName(arrayField.title);
+            String itemSlug = toKebabCase(itemName);
+            // arrayField.children holds either the object item's real fields
+            // (ARRAY_OBJECT) or a singleton list with the one synthetic
+            // item field built in readFields (ARRAY_SCALAR) — same shape
+            // either way, so both render through the same field-group writer.
+            written.add(writeReactFieldGroup(out, itemName, itemSlug, specFileName, arrayField.children));
+        }
+
+        return written;
+    }
+
+    // Emits one component: a <fieldset> of inputs/selects for scalar fields,
+    // recursing inline for nested (non-array) object fields. Used for the
+    // spec's main component and for each array field's standalone item
+    // component — both are "a group of fields", just at different nesting
+    // starting points. Array fields themselves never reach this method
+    // directly (see writeReactComponents); their extracted item fields do.
+    private Path writeReactFieldGroup(Path out, String name, String slug, String specFileName, List<SpecField> fields) throws IOException {
         StringBuilder jsx = new StringBuilder();
         jsx.append("import React from 'react';\n");
         jsx.append("import { Field } from '@aemforms/af-react-components';\n\n");
         jsx.append("// Generated by SpecToCodeGenerator from ").append(specFileName).append(".\n");
         jsx.append("// Regenerate from the spec instead of hand-editing this file.\n");
+        jsx.append("//\n");
+        jsx.append("// If this file represents one item of a repeatable array field: this\n");
+        jsx.append("// component intentionally contains no add/remove logic. In real Adaptive\n");
+        jsx.append("// Forms, repetition is a panel/form-model concern handled by the renderer\n");
+        jsx.append("// (see @aemforms/af-react-renderer's renderChildren + the 'repeater'\n");
+        jsx.append("// mapping) — a field component's code is identical whether it's repeated\n");
+        jsx.append("// or not. To actually make this repeatable: register it in App.jsx's\n");
+        jsx.append("// customMappings under its own fieldType key, then configure the\n");
+        jsx.append("// containing panel as repeatable (minItems/maxItems) in AEM Forms Editor.\n");
         jsx.append("const ").append(name).append(" = ({\n");
         jsx.append("  label,\n");
         jsx.append("  description,\n");
@@ -394,55 +806,7 @@ public class SpecToCodeGenerator {
         jsx.append("        <p className=\"").append(slug).append("-description\">{description}</p>\n");
         jsx.append("      )}\n");
         for (SpecField f : fields) {
-            String sublabel = xmlEscape(f.title) + (f.required ? " *" : "");
-            jsx.append("      <label className=\"").append(slug).append("-sublabel\">").append(sublabel).append("</label>\n");
-
-            String fieldId = "`" + ref("id") + '-' + f.name + "`";
-            String fieldName = "`" + ref("name") + '.' + f.name + "`";
-            String className = slug + "-input " + slug + "-" + f.name;
-
-            if (!f.enumValues.isEmpty()) {
-                jsx.append("      <select\n");
-                jsx.append("        id={").append(fieldId).append("}\n");
-                jsx.append("        name={").append(fieldName).append("}\n");
-                jsx.append("        value={(value && value.").append(f.name).append(") || ''}\n");
-                jsx.append("        disabled={!enabled}\n");
-                jsx.append("        required={").append(f.required).append("}\n");
-                jsx.append("        onChange={onChange}\n");
-                jsx.append("        className=\"").append(className).append("\"\n");
-                jsx.append("      >\n");
-                jsx.append("        <option value=\"\">Select...</option>\n");
-                for (String opt : f.enumValues) {
-                    jsx.append("        <option value=\"").append(jsEscape(opt)).append("\">").append(xmlEscape(opt)).append("</option>\n");
-                }
-                jsx.append("      </select>\n");
-            } else {
-                jsx.append("      <input\n");
-                jsx.append("        id={").append(fieldId).append("}\n");
-                jsx.append("        name={").append(fieldName).append("}\n");
-                jsx.append("        type=\"").append(htmlInputType(f)).append("\"\n");
-                jsx.append("        value={(value && value.").append(f.name).append(") || ''}\n");
-                jsx.append("        disabled={!enabled}\n");
-                jsx.append("        required={").append(f.required).append("}\n");
-                if (f.minLength != null) {
-                    jsx.append("        minLength={").append(f.minLength).append("}\n");
-                }
-                if (f.maxLength != null) {
-                    jsx.append("        maxLength={").append(f.maxLength).append("}\n");
-                }
-                if (f.pattern != null) {
-                    jsx.append("        pattern=\"").append(jsEscape(f.pattern)).append("\"\n");
-                }
-                if (f.minimum != null) {
-                    jsx.append("        min={").append(f.minimum).append("}\n");
-                }
-                if (f.maximum != null) {
-                    jsx.append("        max={").append(f.maximum).append("}\n");
-                }
-                jsx.append("        onChange={onChange}\n");
-                jsx.append("        className=\"").append(className).append("\"\n");
-                jsx.append("      />\n");
-            }
+            appendReactField(jsx, f, slug, "value", "");
         }
         jsx.append("    </div>\n");
         jsx.append("  );\n");
@@ -458,6 +822,98 @@ public class SpecToCodeGenerator {
         Files.createDirectories(reactFile.getParent());
         Files.write(reactFile, jsx.toString().getBytes(StandardCharsets.UTF_8));
         return reactFile;
+    }
+
+    // valueAccessor is the already-built JS expression for reading this
+    // field's slice of `value` (e.g. "value" at the top level, or
+    // "(value && value.address)" one level into a nested object).
+    // pathSuffix accumulates a dot-joined logical path for nested (non-array)
+    // object fields (e.g. "" at the top level, ".address" one level in) —
+    // used to build both the dotted `name` path (form-data addressing) and
+    // a hyphenated `id` suffix (DOM id uniqueness) at each leaf.
+    private void appendReactField(StringBuilder jsx, SpecField f, String slug, String valueAccessor, String pathSuffix) {
+        boolean guarded = f.kind == FieldKind.SCALAR && f.visibleWhen != null;
+
+        if (f.kind == FieldKind.OBJECT) {
+            jsx.append("      <fieldset className=\"").append(slug).append('-').append(f.name).append("-group\">\n");
+            jsx.append("        <legend>").append(xmlEscape(f.title)).append("</legend>\n");
+            String childValueAccessor = "(" + valueAccessor + " && " + valueAccessor + "." + f.name + ")";
+            String childPathSuffix = pathSuffix + "." + f.name;
+            for (SpecField child : f.children) {
+                appendReactField(jsx, child, slug, childValueAccessor, childPathSuffix);
+            }
+            jsx.append("      </fieldset>\n");
+            return;
+        }
+
+        if (guarded) {
+            // The guarded block below renders more than one sibling element
+            // (a <label> and an <input>/<select>) — a JSX expression
+            // container like {cond && (...)} needs exactly one root element,
+            // so wrap them in a Fragment rather than leaving them adjacent.
+            jsx.append("      {(").append(valueAccessor).append(" && ").append(valueAccessor).append(".")
+                    .append(f.visibleWhen.field).append(" === '").append(jsEscape(f.visibleWhen.equalsValue)).append("') && (\n");
+            jsx.append("      <>\n");
+        }
+
+        String fieldTitle = xmlEscape(f.title) + (f.required ? " *" : "");
+        jsx.append("      <label className=\"").append(slug).append("-sublabel\">").append(fieldTitle).append("</label>\n");
+
+        String leafPath = pathSuffix + "." + f.name;             // e.g. ".street" or ".address.street"
+        String idSuffix = leafPath.replace('.', '-');            // e.g. "-street" or "-address-street"
+        String fieldId = "`" + ref("id") + idSuffix + "`";
+        String fieldName = "`" + ref("name") + leafPath + "`";
+        String className = slug + "-input " + slug + "-" + f.name;
+        String valueAccess = "(" + valueAccessor + " && " + valueAccessor + "." + f.name + ") || ''";
+        boolean required = f.required;
+
+        if (!f.constraints.enumValues.isEmpty()) {
+            jsx.append("      <select\n");
+            jsx.append("        id={").append(fieldId).append("}\n");
+            jsx.append("        name={").append(fieldName).append("}\n");
+            jsx.append("        value={").append(valueAccess).append("}\n");
+            jsx.append("        disabled={!enabled}\n");
+            jsx.append("        required={").append(required).append("}\n");
+            jsx.append("        onChange={onChange}\n");
+            jsx.append("        className=\"").append(className).append("\"\n");
+            jsx.append("      >\n");
+            jsx.append("        <option value=\"\">Select...</option>\n");
+            for (String opt : f.constraints.enumValues) {
+                jsx.append("        <option value=\"").append(jsEscape(opt)).append("\">").append(xmlEscape(opt)).append("</option>\n");
+            }
+            jsx.append("      </select>\n");
+        } else {
+            jsx.append("      <input\n");
+            jsx.append("        id={").append(fieldId).append("}\n");
+            jsx.append("        name={").append(fieldName).append("}\n");
+            jsx.append("        type=\"").append(htmlInputType(f.javaType, f.constraints)).append("\"\n");
+            jsx.append("        value={").append(valueAccess).append("}\n");
+            jsx.append("        disabled={!enabled}\n");
+            jsx.append("        required={").append(required).append("}\n");
+            if (f.constraints.minLength != null) {
+                jsx.append("        minLength={").append(f.constraints.minLength).append("}\n");
+            }
+            if (f.constraints.maxLength != null) {
+                jsx.append("        maxLength={").append(f.constraints.maxLength).append("}\n");
+            }
+            if (f.constraints.pattern != null) {
+                jsx.append("        pattern=\"").append(jsEscape(f.constraints.pattern)).append("\"\n");
+            }
+            if (f.constraints.minimum != null) {
+                jsx.append("        min={").append(f.constraints.minimum).append("}\n");
+            }
+            if (f.constraints.maximum != null) {
+                jsx.append("        max={").append(f.constraints.maximum).append("}\n");
+            }
+            jsx.append("        onChange={onChange}\n");
+            jsx.append("        className=\"").append(className).append("\"\n");
+            jsx.append("      />\n");
+        }
+
+        if (guarded) {
+            jsx.append("      </>\n");
+            jsx.append("      )}\n");
+        }
     }
 
     private String xmlEscape(String s) {
@@ -481,37 +937,5 @@ public class SpecToCodeGenerator {
     // Java string literal that itself is a user-facing validation message.
     private String jsonEscape(String s) {
         return javaEscape(s);
-    }
-
-    private static final class SpecField {
-        final String name;
-        final String javaType;
-        final String title;
-        final String description;
-        final boolean required;
-        final String format;
-        final Integer minLength;
-        final Integer maxLength;
-        final String pattern;
-        final Double minimum;
-        final Double maximum;
-        final List<String> enumValues;
-
-        SpecField(String name, String javaType, String title, String description, boolean required,
-                String format, Integer minLength, Integer maxLength, String pattern,
-                Double minimum, Double maximum, List<String> enumValues) {
-            this.name = name;
-            this.javaType = javaType;
-            this.title = title;
-            this.description = description;
-            this.required = required;
-            this.format = format;
-            this.minLength = minLength;
-            this.maxLength = maxLength;
-            this.pattern = pattern;
-            this.minimum = minimum;
-            this.maximum = maximum;
-            this.enumValues = enumValues;
-        }
     }
 }

@@ -300,4 +300,311 @@ class SpecToCodeGeneratorTest {
         assertTrue(model.contains("Arrays.asList(\"Engineering\", \"Sales\", \"Marketing\", \"Support\")"));
         assertTrue(model.contains(".contains(getDepartment())"));
     }
+
+    // --- nested objects, repeatable fields, conditional visibility ---
+
+    @Test
+    void testGenerateNestedObjectCreatesChildModelAndChildResource() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Employee Profile\",\n" +
+                "  \"properties\": {\n" +
+                "    \"employeeName\": { \"type\": \"string\", \"title\": \"Employee Name\" },\n" +
+                "    \"address\": {\n" +
+                "      \"type\": \"object\", \"title\": \"Home Address\",\n" +
+                "      \"properties\": {\n" +
+                "        \"street\": { \"type\": \"string\", \"title\": \"Street\" },\n" +
+                "        \"city\": { \"type\": \"string\", \"title\": \"City\" }\n" +
+                "      },\n" +
+                "      \"required\": [\"street\"]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("employee-profile.json", spec);
+
+        specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        Path childModel = tempDir.resolve("core/src/main/java/com/acme/core/models/HomeAddress.java");
+        assertTrue(Files.exists(childModel), "Nested object should generate its own child Sling Model");
+        String childSrc = Files.readString(childModel);
+        // Child models adapt the child Resource directly, not the request —
+        // ChildResourceInjector adapts the Resource itself via ModelFactory.
+        assertTrue(childSrc.contains("import org.apache.sling.api.resource.Resource;"));
+        assertTrue(childSrc.contains("@Model(adaptables = Resource.class,"));
+        assertTrue(childSrc.contains("private String street;"));
+        assertTrue(childSrc.contains("errors.add(\"Street is required\");"), "Child model gets its own validate()");
+
+        String parentSrc = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/EmployeeProfile.java"));
+        assertTrue(parentSrc.contains("import org.apache.sling.models.annotations.injectorspecific.ChildResource;"));
+        assertTrue(parentSrc.contains("@ChildResource"));
+        assertTrue(parentSrc.contains("private HomeAddress address;"));
+        assertTrue(parentSrc.contains("public HomeAddress getAddress() {"));
+        assertTrue(parentSrc.contains("for (String e : getAddress().validate()) {"), "Parent validate() recurses into the child");
+
+        String html = Files.readString(tempDir.resolve(
+                "ui.apps/src/main/content/jcr_root/apps/AcmeApp/components/generated/employee-profile/employee-profile.html"));
+        // HTL's expression resolver follows Java getter chains — no
+        // data-sly-resource/include needed for nested field access.
+        assertTrue(html.contains("${model.address.street}"));
+        assertTrue(html.contains("${model.address.city}"));
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/EmployeeProfile.jsx"));
+        assertTrue(jsx.contains("<fieldset className=\"employee-profile-address-group\">"));
+        assertTrue(jsx.contains("<legend>Home Address</legend>"));
+        assertTrue(jsx.contains("name={`${name}.address.street`}"), "Nested field gets a dotted name path");
+        assertTrue(jsx.contains("id={`${id}-address-street`}"), "Nested field gets a hyphenated id");
+    }
+
+    @Test
+    void testGenerateScalarArrayCreatesStandaloneItemComponentNoAddRemoveLogic() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Contact List\",\n" +
+                "  \"properties\": {\n" +
+                "    \"phoneNumbers\": {\n" +
+                "      \"type\": \"array\", \"title\": \"Phone Numbers\",\n" +
+                "      \"items\": { \"type\": \"string\", \"format\": \"tel\" }\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("contact-list.json", spec);
+
+        specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/ContactList.java"));
+        assertTrue(model.contains("private String[] phoneNumbers;"), "Scalar arrays bind via multi-value @ValueMapValue, not a child model");
+        assertTrue(model.contains("public String[] getPhoneNumbers() {"));
+        assertFalse(Files.exists(tempDir.resolve("core/src/main/java/com/acme/core/models/PhoneNumbers.java")),
+                "No child Sling Model file for a scalar array — nothing to adapt as a Resource");
+
+        String html = Files.readString(tempDir.resolve(
+                "ui.apps/src/main/content/jcr_root/apps/AcmeApp/components/generated/contact-list/contact-list.html"));
+        assertTrue(html.contains("data-sly-list.item=\"${model.phoneNumbers}\""));
+
+        // Repetition in real Adaptive Forms is a panel/form-model concern
+        // (see @aemforms/af-react-renderer's renderChildren) — the item
+        // component itself must not contain add/remove logic.
+        Path itemFile = tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/PhoneNumbers.jsx");
+        assertTrue(Files.exists(itemFile), "Array item gets its own standalone, independently-mappable component");
+        String itemJsx = Files.readString(itemFile);
+        assertTrue(itemJsx.contains("type=\"tel\""));
+        assertFalse(itemJsx.contains("useState"));
+        assertFalse(itemJsx.contains("dispatchAddItem"));
+        assertFalse(itemJsx.contains(".map("), "No client-side iteration — one item per component instance");
+    }
+
+    @Test
+    void testGenerateObjectArrayCreatesChildModelAndStandaloneItemComponent() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Household\",\n" +
+                "  \"properties\": {\n" +
+                "    \"dependents\": {\n" +
+                "      \"type\": \"array\", \"title\": \"Dependents\", \"itemTitle\": \"Dependent\",\n" +
+                "      \"items\": {\n" +
+                "        \"type\": \"object\",\n" +
+                "        \"properties\": {\n" +
+                "          \"name\": { \"type\": \"string\", \"title\": \"Name\" },\n" +
+                "          \"age\": { \"type\": \"integer\", \"title\": \"Age\" }\n" +
+                "        },\n" +
+                "        \"required\": [\"name\"]\n" +
+                "      }\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("household.json", spec);
+
+        specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        assertTrue(Files.exists(tempDir.resolve("core/src/main/java/com/acme/core/models/Dependent.java")),
+                "\"itemTitle\" names the child model, not a guessed singularization of the array field");
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/Household.java"));
+        assertTrue(model.contains("private List<Dependent> dependents;"));
+        assertTrue(model.contains(
+                "return dependents != null ? dependents : Collections.emptyList();"),
+                "Null-safe: @ChildResource yields null, not an empty list, when unauthored");
+
+        String html = Files.readString(tempDir.resolve(
+                "ui.apps/src/main/content/jcr_root/apps/AcmeApp/components/generated/household/household.html"));
+        assertTrue(html.contains("data-sly-list.item=\"${model.dependents}\""));
+        assertTrue(html.contains("${item.name}"));
+        assertTrue(html.contains("${item.age}"));
+
+        Path itemFile = tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/Dependent.jsx");
+        assertTrue(Files.exists(itemFile));
+        String itemJsx = Files.readString(itemFile);
+        assertTrue(itemJsx.contains("name={`${name}.name`}"));
+        assertTrue(itemJsx.contains("name={`${name}.age`}"));
+        assertFalse(itemJsx.contains("useState"));
+    }
+
+    @Test
+    void testGenerateConditionalVisibilityAffectsHtlReactAndValidate() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Marital Info\",\n" +
+                "  \"properties\": {\n" +
+                "    \"maritalStatus\": { \"type\": \"string\", \"title\": \"Marital Status\", \"enum\": [\"Single\", \"Married\"] },\n" +
+                "    \"spouseName\": { \"type\": \"string\", \"title\": \"Spouse Name\",\n" +
+                "      \"visibleWhen\": { \"field\": \"maritalStatus\", \"equals\": \"Married\" } }\n" +
+                "  },\n" +
+                "  \"required\": [\"spouseName\"]\n" +
+                "}\n";
+        Path specFile = writeSpec("marital-info.json", spec);
+
+        specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/MaritalInfo.java"));
+        assertTrue(model.contains("if (\"Married\".equals(getMaritalStatus())) {"));
+        assertTrue(model.contains("errors.add(\"Spouse Name is required\");"),
+                "Required-ness only applies inside the visibleWhen guard");
+
+        String html = Files.readString(tempDir.resolve(
+                "ui.apps/src/main/content/jcr_root/apps/AcmeApp/components/generated/marital-info/marital-info.html"));
+        // core/src/test/java is Velocity-filtered too — a literal dollar-brace
+        // wrapping a complex expression (operators, quoted string) fails to
+        // parse as a Velocity reference, the same collision the generator's
+        // own ref() helper guards against. Simple property-chain assertions
+        // elsewhere in this file (${model.firstName} etc.) parse fine; this
+        // one has && / == / a quoted string inside the braces, so build it
+        // from two literals instead of writing the sequence directly.
+        assertTrue(html.contains("$" + "{model.spouseName && model.maritalStatus == 'Married'}"));
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/MaritalInfo.jsx"));
+        assertTrue(jsx.contains("{(value && value.maritalStatus === 'Married') && ("));
+    }
+
+    @Test
+    void testGenerateThrowsForNestingBeyondOneLevel() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Bad\",\n" +
+                "  \"properties\": {\n" +
+                "    \"outer\": { \"type\": \"object\", \"title\": \"Outer\",\n" +
+                "      \"properties\": {\n" +
+                "        \"inner\": { \"type\": \"object\", \"title\": \"Inner\",\n" +
+                "          \"properties\": { \"x\": { \"type\": \"string\", \"title\": \"X\" } } }\n" +
+                "      } }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("bad-nesting.json", spec);
+
+        IOException ex = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+        assertTrue(ex.getMessage().contains("one-level nesting limit"));
+    }
+
+    @Test
+    void testGenerateThrowsForVisibleWhenReferencingUnknownField() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Bad\",\n" +
+                "  \"properties\": {\n" +
+                "    \"a\": { \"type\": \"string\", \"title\": \"A\",\n" +
+                "      \"visibleWhen\": { \"field\": \"doesNotExist\", \"equals\": \"x\" } }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("bad-visiblewhen.json", spec);
+
+        IOException ex = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+        assertTrue(ex.getMessage().contains("referencing unknown field"));
+    }
+
+    @Test
+    void testGenerateThrowsForVisibleWhenSelfReference() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Bad\",\n" +
+                "  \"properties\": {\n" +
+                "    \"a\": { \"type\": \"string\", \"title\": \"A\",\n" +
+                "      \"visibleWhen\": { \"field\": \"a\", \"equals\": \"x\" } }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("bad-self-ref.json", spec);
+
+        IOException ex = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+        assertTrue(ex.getMessage().contains("referencing itself"));
+    }
+
+    @Test
+    void testGenerateThrowsForVisibleWhenReferencingNonScalarField() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Bad\",\n" +
+                "  \"properties\": {\n" +
+                "    \"address\": { \"type\": \"object\", \"title\": \"Address\",\n" +
+                "      \"properties\": { \"street\": { \"type\": \"string\", \"title\": \"Street\" } } },\n" +
+                "    \"a\": { \"type\": \"string\", \"title\": \"A\",\n" +
+                "      \"visibleWhen\": { \"field\": \"address\", \"equals\": \"x\" } }\n" +
+                "  }\n" +
+                "}\n";
+        Path specFile = writeSpec("bad-nonscalar-ref.json", spec);
+
+        IOException ex = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generate(specFile.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+        assertTrue(ex.getMessage().contains("referencing non-scalar field"));
+    }
+
+    // The actual specs/benefits-enrollment.json shipped by this archetype —
+    // exercises nested objects, scalar arrays, object arrays, and
+    // conditional visibility together, the same integration-golden pattern
+    // as job-application.json for validation keywords.
+    private static final String BENEFITS_ENROLLMENT_SPEC = "{\n" +
+            "  \"title\": \"Benefits Enrollment\",\n" +
+            "  \"type\": \"object\",\n" +
+            "  \"properties\": {\n" +
+            "    \"employeeName\": { \"type\": \"string\", \"title\": \"Employee Name\", \"minLength\": 2, \"maxLength\": 100 },\n" +
+            "    \"maritalStatus\": { \"type\": \"string\", \"title\": \"Marital Status\", \"enum\": [\"Single\", \"Married\"] },\n" +
+            "    \"spouseName\": { \"type\": \"string\", \"title\": \"Spouse Name\",\n" +
+            "      \"visibleWhen\": { \"field\": \"maritalStatus\", \"equals\": \"Married\" } },\n" +
+            "    \"mailingAddress\": {\n" +
+            "      \"type\": \"object\", \"title\": \"Mailing Address\",\n" +
+            "      \"properties\": {\n" +
+            "        \"street\": { \"type\": \"string\", \"title\": \"Street\" },\n" +
+            "        \"city\": { \"type\": \"string\", \"title\": \"City\" },\n" +
+            "        \"zipCode\": { \"type\": \"string\", \"title\": \"ZIP Code\", \"pattern\": \"^\\\\d{5}$\" }\n" +
+            "      },\n" +
+            "      \"required\": [\"street\", \"city\", \"zipCode\"]\n" +
+            "    },\n" +
+            "    \"phoneNumbers\": {\n" +
+            "      \"type\": \"array\", \"title\": \"Phone Numbers\",\n" +
+            "      \"items\": { \"type\": \"string\", \"format\": \"tel\", \"pattern\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\" }\n" +
+            "    },\n" +
+            "    \"dependents\": {\n" +
+            "      \"type\": \"array\", \"title\": \"Dependents\", \"itemTitle\": \"Dependent\",\n" +
+            "      \"items\": {\n" +
+            "        \"type\": \"object\",\n" +
+            "        \"properties\": {\n" +
+            "          \"name\": { \"type\": \"string\", \"title\": \"Name\" },\n" +
+            "          \"age\": { \"type\": \"integer\", \"title\": \"Age\", \"minimum\": 0, \"maximum\": 120 },\n" +
+            "          \"relationship\": { \"type\": \"string\", \"title\": \"Relationship\", \"enum\": [\"Child\", \"Parent\", \"Other\"] }\n" +
+            "        },\n" +
+            "        \"required\": [\"name\", \"relationship\"]\n" +
+            "      }\n" +
+            "    }\n" +
+            "  },\n" +
+            "  \"required\": [\"employeeName\", \"maritalStatus\", \"spouseName\", \"mailingAddress\"]\n" +
+            "}\n";
+
+    @Test
+    void testGenerateWithBenefitsEnrollmentSpecExercisesEveryCapabilityTogether() throws IOException {
+        Path spec = writeSpec("benefits-enrollment.json", BENEFITS_ENROLLMENT_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        Path modelsDir = tempDir.resolve("core/src/main/java/com/acme/core/models");
+        assertTrue(Files.exists(modelsDir.resolve("BenefitsEnrollment.java")));
+        assertTrue(Files.exists(modelsDir.resolve("MailingAddress.java")), "Nested object -> child model");
+        assertTrue(Files.exists(modelsDir.resolve("Dependent.java")), "Object array -> child model, named via itemTitle");
+        assertFalse(Files.exists(modelsDir.resolve("PhoneNumbers.java")), "Scalar array never gets a child model");
+
+        Path reactDir = tempDir.resolve("ui.frontend.react.forms.af/src/main/webpack/components/generated");
+        assertTrue(Files.exists(reactDir.resolve("BenefitsEnrollment.jsx")));
+        assertTrue(Files.exists(reactDir.resolve("PhoneNumbers.jsx")), "Scalar array item -> standalone component");
+        assertTrue(Files.exists(reactDir.resolve("Dependent.jsx")), "Object array item -> standalone component");
+
+        String model = Files.readString(modelsDir.resolve("BenefitsEnrollment.java"));
+        assertTrue(model.contains("if (\"Married\".equals(getMaritalStatus())) {"));
+        assertTrue(model.contains("for (String e : getMailingAddress().validate()) {"));
+        assertTrue(model.contains("for (String e : dependentsItem.validate()) {"));
+    }
 }

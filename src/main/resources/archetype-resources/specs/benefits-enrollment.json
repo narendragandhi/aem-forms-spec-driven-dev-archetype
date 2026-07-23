@@ -1,0 +1,52 @@
+{
+  "title": "Benefits Enrollment",
+  "type": "object",
+  "properties": {
+    "employeeName": {
+      "type": "string",
+      "title": "Employee Name",
+      "minLength": 2,
+      "maxLength": 100
+    },
+    "maritalStatus": {
+      "type": "string",
+      "title": "Marital Status",
+      "enum": ["Single", "Married"]
+    },
+    "spouseName": {
+      "type": "string",
+      "title": "Spouse Name",
+      "visibleWhen": { "field": "maritalStatus", "equals": "Married" }
+    },
+    "mailingAddress": {
+      "type": "object",
+      "title": "Mailing Address",
+      "properties": {
+        "street": { "type": "string", "title": "Street" },
+        "city": { "type": "string", "title": "City" },
+        "zipCode": { "type": "string", "title": "ZIP Code", "pattern": "^\\d{5}$" }
+      },
+      "required": ["street", "city", "zipCode"]
+    },
+    "phoneNumbers": {
+      "type": "array",
+      "title": "Phone Numbers",
+      "items": { "type": "string", "format": "tel", "pattern": "^\\d{3}-\\d{3}-\\d{4}$" }
+    },
+    "dependents": {
+      "type": "array",
+      "title": "Dependents",
+      "itemTitle": "Dependent",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "title": "Name" },
+          "age": { "type": "integer", "title": "Age", "minimum": 0, "maximum": 120 },
+          "relationship": { "type": "string", "title": "Relationship", "enum": ["Child", "Parent", "Other"] }
+        },
+        "required": ["name", "relationship"]
+      }
+    }
+  },
+  "required": ["employeeName", "maritalStatus", "spouseName", "mailingAddress"]
+}

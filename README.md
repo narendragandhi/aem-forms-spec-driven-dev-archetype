@@ -117,10 +117,19 @@ though you're free to have one draft the spec itself.
 }
 ```
    See `specs/card-component.json` (a display component — this is the exact
-   spec `Card.java`/`card.html` were hand-built from) and
-   `specs/job-application.json` (a form exercising every supported keyword:
-   `required`, `format`, `minLength`/`maxLength`, `pattern`, `minimum`/
-   `maximum`, `enum`) for full worked examples.
+   spec `Card.java`/`card.html` were hand-built from), `specs/job-application.json`
+   (a form exercising every validation keyword: `required`, `format`,
+   `minLength`/`maxLength`, `pattern`, `minimum`/`maximum`, `enum`), and
+   `specs/benefits-enrollment.json` (nested objects, repeatable fields, and
+   conditional visibility together) for full worked examples.
+
+   Two more keywords beyond plain JSON Schema:
+   - `"type": "object"` with its own `"properties"` — a nested field group,
+     one level deep (a nested object's own fields must be scalar).
+   - `"type": "array"` with `"items"` (scalar or object) — a repeatable
+     field, also one level deep.
+   - `"visibleWhen": {"field": "...", "equals": "..."}` on a scalar field —
+     conditional visibility against a sibling top-level scalar field.
 
 2. **Generate the three artifacts**:
 ```java
@@ -135,24 +144,39 @@ new SpecToCodeGenerator().generate(
    - a **Sling Model** in `core/.../core/models/` — fields typed from
      `type`, plus a `validate()` method that re-checks `required`,
      `minLength`/`maxLength`, `pattern`, `minimum`/`maximum`, and `enum`
-     server-side (HTML5 constraints alone aren't real validation)
+     server-side (HTML5 constraints alone aren't real validation). A nested
+     object or a repeatable object field gets its own child Sling Model,
+     wired via `@ChildResource` — real JCR-backed nesting/repetition, the
+     same pattern a hand-authored WCM dialog component would use.
    - an **AEM/HTL component** in `ui.apps/.../components/generated/`,
-     required fields marked with `*`
+     required fields marked with `*`, nested fields accessed via HTL's
+     getter-chain resolution (`${model.address.street}`, no extra
+     directive needed), repeatable fields rendered via `data-sly-list`
    - a **React field component** in
      `ui.frontend.react.forms.af/.../components/generated/` — `format`
      selects the right HTML5 input type (email/date/tel/url), an `enum`
-     renders a `<select>` instead of a text input, and the same
-     constraints become HTML5 attributes
+     renders a `<select>` instead of a text input, the same constraints
+     become HTML5 attributes, and `visibleWhen` wraps the field in a
+     conditional. **Repeatable fields generate a standalone single-item
+     component, not add/remove UI** — in real Adaptive Forms, repetition
+     is a panel/form-model concern the renderer handles (see
+     `@aemforms/af-react-renderer`'s `renderChildren`), not something a
+     field component's own code manages. To actually make one repeatable:
+     register the generated component in `App.jsx`'s `customMappings`
+     under its own field type, then configure the containing panel as
+     repeatable (`minItems`/`maxItems`) in AEM Forms Editor.
 
 3. **Build and deploy**:
 ```bash
 mvn clean install -PautoInstallSinglePackage
 ```
 
-Current scope: flat fields only (string/boolean/integer/number) — no nested
-objects or arrays yet, and the generated component isn't auto-wired into a
-submission handler. Good for the common case (one component, one round of
-named fields); extend `SpecToCodeGenerator` yourself for anything richer.
+Current scope: nesting and repetition are one level deep (a nested object's
+own fields, or a repeatable array's item fields, must be scalar — no
+object-in-object, no array-in-array). `visibleWhen` supports simple equality
+only, against a sibling top-level scalar field. The generated component
+isn't auto-wired into a submission handler. Good for the common case;
+extend `SpecToCodeGenerator` yourself for anything richer.
 
 ## Interactive Communications (IC)
 
