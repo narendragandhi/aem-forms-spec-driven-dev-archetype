@@ -100,26 +100,59 @@ Developer                    Claude/AI
 
 ### Extensibility for Custom Components
 
-1. **Define a spec** in `specs/my-component.json`:
+`SpecToCodeGenerator` (`core/.../workflow/SpecToCodeGenerator.java`) turns a
+JSON Schema-style spec into a working component — no AI round-trip required,
+though you're free to have one draft the spec itself.
+
+1. **Define a spec** in `specs/my-component.json` — JSON Schema `properties`,
+   not a flat field list, so the usual keywords apply directly:
 ```json
 {
-  "name": "CustomerFeedback",
-  "fields": [
-    {"name": "rating", "type": "number", "min": 1, "max": 5},
-    {"name": "comment", "type": "string", "maxLength": 500}
-  ]
+  "title": "Customer Feedback",
+  "properties": {
+    "rating": { "type": "integer", "title": "Rating", "minimum": 1, "maximum": 5 },
+    "comment": { "type": "string", "title": "Comment", "maxLength": 500 }
+  },
+  "required": ["rating"]
 }
 ```
+   See `specs/card-component.json` (a display component — this is the exact
+   spec `Card.java`/`card.html` were hand-built from) and
+   `specs/job-application.json` (a form exercising every supported keyword:
+   `required`, `format`, `minLength`/`maxLength`, `pattern`, `minimum`/
+   `maximum`, `enum`) for full worked examples.
 
-2. **Ask AI to generate**:
-   - Sling Model in `core/`
-   - AEM component in `ui.apps/`
-   - React component in `ui.frontend.react.forms.af/`
+2. **Generate the three artifacts**:
+```java
+new SpecToCodeGenerator().generate(
+    "specs/my-component.json",  // spec path
+    ".",                         // project root
+    "com.mycompany",             // base package
+    "MyFormsApp"                 // app name
+);
+```
+   This produces:
+   - a **Sling Model** in `core/.../core/models/` — fields typed from
+     `type`, plus a `validate()` method that re-checks `required`,
+     `minLength`/`maxLength`, `pattern`, `minimum`/`maximum`, and `enum`
+     server-side (HTML5 constraints alone aren't real validation)
+   - an **AEM/HTL component** in `ui.apps/.../components/generated/`,
+     required fields marked with `*`
+   - a **React field component** in
+     `ui.frontend.react.forms.af/.../components/generated/` — `format`
+     selects the right HTML5 input type (email/date/tel/url), an `enum`
+     renders a `<select>` instead of a text input, and the same
+     constraints become HTML5 attributes
 
 3. **Build and deploy**:
 ```bash
 mvn clean install -PautoInstallSinglePackage
 ```
+
+Current scope: flat fields only (string/boolean/integer/number) — no nested
+objects or arrays yet, and the generated component isn't auto-wired into a
+submission handler. Good for the common case (one component, one round of
+named fields); extend `SpecToCodeGenerator` yourself for anything richer.
 
 ## Interactive Communications (IC)
 
