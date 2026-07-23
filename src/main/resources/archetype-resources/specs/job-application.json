@@ -1,0 +1,46 @@
+{
+  "title": "Job Application",
+  "type": "object",
+  "properties": {
+    "fullName": {
+      "type": "string",
+      "title": "Full Name",
+      "description": "Enter your full legal name.",
+      "minLength": 2,
+      "maxLength": 100
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email Address",
+      "description": "We'll send confirmation here."
+    },
+    "phone": {
+      "type": "string",
+      "format": "tel",
+      "title": "Phone Number",
+      "description": "Format: 555-123-4567",
+      "pattern": "^\\d{3}-\\d{3}-\\d{4}$"
+    },
+    "yearsOfExperience": {
+      "type": "integer",
+      "title": "Years of Experience",
+      "description": "Relevant professional experience.",
+      "minimum": 0,
+      "maximum": 50
+    },
+    "department": {
+      "type": "string",
+      "title": "Department",
+      "description": "Which team are you applying to?",
+      "enum": ["Engineering", "Sales", "Marketing", "Support"]
+    },
+    "coverLetter": {
+      "type": "string",
+      "title": "Cover Letter",
+      "description": "Optional — tell us why you're a good fit.",
+      "maxLength": 2000
+    }
+  },
+  "required": ["fullName", "email", "phone", "department"]
+}

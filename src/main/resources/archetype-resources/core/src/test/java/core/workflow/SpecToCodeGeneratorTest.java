@@ -198,4 +198,106 @@ class SpecToCodeGeneratorTest {
                 .anyMatch(e -> e.getMessage().contains("Spec-to-Code Generation completed for:"));
         assertTrue(hasCompletionLog, "Should log completion message");
     }
+
+    // --- richer JSON Schema keywords: required, format, constraints, enum ---
+
+    // The actual specs/job-application.json shipped by this archetype —
+    // exercises required, format (email/tel), pattern, minimum/maximum, and
+    // enum together, so it doubles as an integration-level golden reference.
+    private static final String JOB_APPLICATION_SPEC = "{\n" +
+            "  \"title\": \"Job Application\",\n" +
+            "  \"properties\": {\n" +
+            "    \"fullName\": { \"type\": \"string\", \"title\": \"Full Name\", \"minLength\": 2, \"maxLength\": 100 },\n" +
+            "    \"email\": { \"type\": \"string\", \"format\": \"email\", \"title\": \"Email Address\" },\n" +
+            "    \"phone\": { \"type\": \"string\", \"format\": \"tel\", \"title\": \"Phone Number\", \"pattern\": \"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\" },\n" +
+            "    \"yearsOfExperience\": { \"type\": \"integer\", \"title\": \"Years of Experience\", \"minimum\": 0, \"maximum\": 50 },\n" +
+            "    \"department\": { \"type\": \"string\", \"title\": \"Department\", \"enum\": [\"Engineering\", \"Sales\", \"Marketing\", \"Support\"] },\n" +
+            "    \"coverLetter\": { \"type\": \"string\", \"title\": \"Cover Letter\", \"maxLength\": 2000 }\n" +
+            "  },\n" +
+            "  \"required\": [\"fullName\", \"email\", \"phone\", \"department\"]\n" +
+            "}\n";
+
+    @Test
+    void testGenerateAppliesRequiredToReactAndValidate() throws IOException {
+        Path spec = writeSpec("job-application.json", JOB_APPLICATION_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/JobApplication.jsx"));
+        assertTrue(jsx.contains("Full Name *"), "Required fields get a visible marker");
+        assertTrue(jsx.contains("Cover Letter"), "Optional field's label has no marker");
+        assertFalse(jsx.contains("Cover Letter *"), "Cover letter is not required per the spec");
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/JobApplication.java"));
+        assertTrue(model.contains("public List<String> validate() {"));
+        assertTrue(model.contains("if (getFullName() == null || getFullName().isEmpty()) {"));
+        assertTrue(model.contains("errors.add(\"Full Name is required\");"));
+        // coverLetter is optional, so validate() must not require it
+        assertFalse(model.contains("Cover Letter is required"));
+    }
+
+    @Test
+    void testGenerateMapsFormatToHtmlInputType() throws IOException {
+        Path spec = writeSpec("job-application.json", JOB_APPLICATION_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/JobApplication.jsx"));
+        assertTrue(jsx.contains("type=\"email\""), "email format should render an email input");
+        assertTrue(jsx.contains("type=\"tel\""), "tel format should render a tel input");
+        assertTrue(jsx.contains("type=\"number\""), "integer type should render a number input regardless of format");
+    }
+
+    @Test
+    void testGenerateAppliesStringConstraints() throws IOException {
+        Path spec = writeSpec("job-application.json", JOB_APPLICATION_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/JobApplication.jsx"));
+        assertTrue(jsx.contains("minLength={2}"));
+        assertTrue(jsx.contains("maxLength={100}"));
+        assertTrue(jsx.contains("pattern=\"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\""));
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/JobApplication.java"));
+        assertTrue(model.contains("getFullName().length() < 2"));
+        assertTrue(model.contains("getFullName().length() > 100"));
+        assertTrue(model.contains("getPhone().matches(\"^\\\\d{3}-\\\\d{3}-\\\\d{4}$\")"));
+    }
+
+    @Test
+    void testGenerateAppliesNumericConstraints() throws IOException {
+        Path spec = writeSpec("job-application.json", JOB_APPLICATION_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/JobApplication.jsx"));
+        assertTrue(jsx.contains("min={0.0}"));
+        assertTrue(jsx.contains("max={50.0}"));
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/JobApplication.java"));
+        assertTrue(model.contains("getYearsOfExperience() < 0.0"));
+        assertTrue(model.contains("getYearsOfExperience() > 50.0"));
+    }
+
+    @Test
+    void testGenerateEnumRendersAsSelectNotInput() throws IOException {
+        Path spec = writeSpec("job-application.json", JOB_APPLICATION_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String jsx = Files.readString(tempDir.resolve(
+                "ui.frontend.react.forms.af/src/main/webpack/components/generated/JobApplication.jsx"));
+        assertTrue(jsx.contains("<select"));
+        assertTrue(jsx.contains("<option value=\"Engineering\">Engineering</option>"));
+        assertTrue(jsx.contains("<option value=\"Support\">Support</option>"));
+
+        String model = Files.readString(tempDir.resolve("core/src/main/java/com/acme/core/models/JobApplication.java"));
+        assertTrue(model.contains("Arrays.asList(\"Engineering\", \"Sales\", \"Marketing\", \"Support\")"));
+        assertTrue(model.contains(".contains(getDepartment())"));
+    }
 }
