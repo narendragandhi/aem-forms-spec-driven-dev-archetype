@@ -178,6 +178,45 @@ only, against a sibling top-level scalar field. The generated component
 isn't auto-wired into a submission handler. Good for the common case;
 extend `SpecToCodeGenerator` yourself for anything richer.
 
+## Document of Record (DoR) Generation
+
+`SignToDoRProcess` (`core/.../workflows/SignToDoRProcess.java`) is an AEM
+Workflow step that, once `AdobeSignOrchestrator` reports an agreement as
+`SIGNED`, calls the real AEM Forms `DoRService` to render the submitted
+Adaptive Form into a PDF Document of Record and stores it as a DAM asset
+(path recorded in the workflow's `dorAssetPath` metadata; failures are
+tracked as `dorStatus=FAILED` rather than aborting the workflow, since
+signing already succeeded).
+
+`DoRService.render()` has real prerequisites beyond the Adaptive Form
+itself — verified against the real API and a real running instance, not
+assumed from the interface shape:
+
+1. A DAM **metadata resource** must exist at the path you get by swapping
+   `/content/forms/af` for `/content/dam/formsanddocuments` in the form's
+   path (e.g. `/content/forms/af/${appName}/financial-application` needs a
+   companion asset at `/content/dam/formsanddocuments/${appName}/financial-application`
+   with a `jcr:content/metadata` node). Forms authored through AEM's Forms
+   Manager get this automatically; forms created as plain WCM pages (as a
+   fully scripted/archetype-generated project might) do not.
+2. That `metadata` node needs a `formmodel` property set to `jsonschema`
+   or `formdatamodel`.
+3. It needs an `xdpRef` (or `dorTemplateRef`) property pointing at a real
+   DoR template asset (an XDP or DOCX template) — this is the visual
+   template the PDF is rendered from.
+4. Actually rendering that template to a PDF depends on AEM Forms' native
+   XFA rendering SDK (`adobe-lc-forms-xfanative-sdk`) being initialized on
+   the instance — a local/dev instance where that SDK failed to start
+   (check for `IllegalStateException: Error getting shared temp directory`
+   in `error.log`) will fail at the rendering step regardless of how
+   correctly everything above is configured.
+
+None of this is optional plumbing `SignToDoRProcess` can work around — it's
+the real, documented shape of AEM Forms' DoR feature. Configure the module
+via `dor_locale`, `adaptive_form_path`, and `dor_storage_path` (OSGi config
+for `SignToDoRProcess.Config`), and ensure the target form has the DAM
+metadata/template setup above before expecting a generated PDF.
+
 ## Interactive Communications (IC)
 
 The archetype includes full support for **AEM Forms Interactive Communications** - personalized, multi-channel document generation.
