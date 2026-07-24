@@ -1,6 +1,19 @@
 # AEM Forms BMAD Archetype
 
-A Maven archetype for creating AI-ready AEM Forms projects using the **BMAD** (Business-Model-Architecture-Development) methodology. Generate production-ready AEM Forms projects in minutes, not days.
+A Maven archetype for creating AI-ready AEM Forms projects using the **BMAD** (Business-Model-Architecture-Development) methodology.
+
+## Implementation Status
+
+Read this before adopting the archetype — it tells you what's real, verified
+code versus scaffolding you'd still need to build.
+
+| Capability | Status | Notes |
+|---|---|---|
+| `SpecToCodeGenerator` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec. Verified via real compile/deploy. Scaffolds custom field *components*, not whole forms — you still assemble panels/layout/submission actions in AEM Forms Editor. |
+| `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
+| `AdobeSignOrchestrator` | **Simulated** | `AdobeSignOrchestratorImpl` is an in-memory map that fabricates an agreement ID and auto-flips it to `SIGNED` after a timeout. No HTTP calls, no real Adobe Sign API usage. Real interface contract, no real integration — see [Adobe Sign Integration](#adobe-sign-integration-simulated). |
+| `FormSubmissionService` | **Stub** | Logs and returns; the `// TODO: Replace with a real HTTP client call` in the source is accurate. Not currently referenced by `SignToDoRProcess`. |
+| Interactive Communications | **Not implemented** | No `InteractiveCommunicationService` class exists anywhere in the codebase. There is real sample DAM content (fragments, IC template folders) but no service to render anything from it — see [Interactive Communications (IC)](#interactive-communications-ic). |
 
 ## Why Use This Archetype?
 
@@ -217,57 +230,54 @@ via `dor_locale`, `adaptive_form_path`, and `dor_storage_path` (OSGi config
 for `SignToDoRProcess.Config`), and ensure the target form has the DAM
 metadata/template setup above before expecting a generated PDF.
 
+## Adobe Sign Integration (Simulated)
+
+`SignToDoRProcess` calls `AdobeSignOrchestrator.createAgreement()` /
+`.getStatus()` to drive its signing step, but the shipped
+`AdobeSignOrchestratorImpl` **does not call Adobe Sign at all**. It's an
+in-memory `ConcurrentHashMap` that fabricates an agreement ID and flips its
+own status from `OUT_FOR_SIGNATURE` to `SIGNED` after a fixed timeout
+(`signingTimeoutMs`, 30s by default). It exists so the workflow shape and
+`SignToDoRProcess`'s DoR-on-signed logic can be built and tested without a
+real Adobe Sign account.
+
+The interface (`AdobeSignOrchestrator.createAgreement(String data)`,
+`.getStatus(String agreementId)`) is a reasonable contract to implement
+against, but treat it purely as a contract — implementing the real Adobe
+Sign REST API calls (agreement creation, webhook or polling-based status
+updates, credential/OAuth handling) is work this archetype does not do for
+you.
+
 ## Interactive Communications (IC)
 
-The archetype includes full support for **AEM Forms Interactive Communications** - personalized, multi-channel document generation.
+**Not implemented.** There is no `InteractiveCommunicationService` class,
+or any other service, anywhere in this codebase. What does exist is sample
+DAM content — reusable document fragments and two example IC content nodes
+— which is real, inspectable content modeling, but nothing renders it into
+an actual document.
 
-### Included IC Assets
+### What actually exists
 
 | Asset Type | Location | Description |
 |------------|----------|-------------|
-| **Document Fragments** | `/content/dam/formsanddocuments/fragments/${appName}/` | Reusable content blocks |
-| **Sample ICs** | `/content/dam/formsanddocuments/ic/${appName}/` | Account Statement, Welcome Kit |
-| **Form Data Models** | `/content/dam/formsanddocuments-fdm/${appName}/` | REST Customer API |
-| **OSGi Configs** | `ui.config/` | Output Service, Document Merge |
+| **Document Fragments** | `/content/dam/formsanddocuments/fragments/${appName}/` | Reusable content blocks (`header`, `footer`, `terms-and-conditions`, `customer-details`) — real JCR content, no rendering logic. |
+| **Sample IC content nodes** | `/content/dam/formsanddocuments/ic/${appName}/` | `account-statement`, `welcome-kit` — placeholder content nodes, not functioning Interactive Communications. |
+| **OSGi Configs** | `ui.config/` | Output Service / Document Merge configuration exists, but nothing in `core/` calls it for IC generation. |
 
-### Document Fragments
+### If you need real IC
 
-Pre-built fragments for common use cases:
-- `header` - Branded document header
-- `footer` - Contact info and disclaimers
-- `terms-and-conditions` - Legal text
-- `customer-details` - Name/address block
+Building `InteractiveCommunicationService` is a real, scoped project of its
+own — the same kind of ground-truth API verification this session did for
+`DoRService` (real AEM Forms Output Service APIs, a real Form Data Model
+data source, real Print/Web channel rendering) would need to happen before
+writing the calling code. The content structure above is a reasonable
+starting point for the DAM layout; the service layer needs to be built from
+scratch.
 
-### Creating an Interactive Communication
-
-```bash
-# 1. Configure your data source (Form Data Model)
-# 2. Create fragments for reusable content
-# 3. Design Print Channel (PDF) and Web Channel (HTML)
-# 4. Generate via API or workflow
-```
-
-### IC Generation API
-
-```java
-// Generate account statement
-InteractiveCommunicationService icService;
-
-Document pdf = icService.generate(
-    "/content/dam/formsanddocuments/ic/${appName}/account-statement",
-    customerId,
-    new ICOptions().setChannel(Channel.PRINT)
-);
-```
-
-### Use Cases
-
-- **Account Statements** - Monthly financial summaries
-- **Welcome Kits** - New customer onboarding
-- **Policy Documents** - Insurance/legal documents
-- **Correspondence** - Personalized letters
-
-> See `bmad/06-Integrations/interactive-communications-guide.md` for full documentation.
+`bmad/06-Integrations/interactive-communications-guide.md` describes the
+intended architecture (Print/Web channel split, FDM data sourcing) — read
+it as a design sketch to build against, not documentation of something
+already working.
 
 > See `bmad/00-Project-Initialization/forms-version-compatibility.md` for AFaaCS vs 6.5 guidance.
 
@@ -359,6 +369,47 @@ Add BEAD (Business Entity AI Definition) files:
 | NPM peer dependency errors | Uses `--legacy-peer-deps` automatically |
 | Frontend tests failing | Skip with `-DskipFrontendTests=true` |
 
+## Next Steps
+
+Roughly in priority order if you're adopting this archetype for a real
+project — each of these is a real gap, not a nice-to-have:
+
+1. **Decide your DoR authoring strategy before you need it.** `SignToDoRProcess`
+   is correct, but it only works against DAM-backed (Forms Manager-style)
+   forms. If your project will author Adaptive Forms as Core Components WCM
+   pages (the modern default), either switch to Forms Manager authoring for
+   any form that needs a Document of Record, or build tooling to
+   auto-provision the companion DAM metadata resource + `xdpRef` template
+   this archetype currently expects you to create by hand. Confirm your
+   local/target AEM instance's native XFA rendering SDK actually starts
+   (`error.log` for `IllegalStateException: Error getting shared temp
+   directory`) — DoR generation is silently dead in the water otherwise.
+2. **Implement real Adobe Sign integration**, or drop the pretense that one
+   exists. `AdobeSignOrchestratorImpl` is a timer-based simulator — replace
+   it with real Adobe Sign REST API calls (agreement creation, OAuth/API
+   key handling, and either webhook or polling-based status updates) before
+   relying on `SignToDoRProcess` for anything beyond a demo.
+3. **Scope and build `InteractiveCommunicationService` from scratch** if IC
+   is actually part of your project — do the same ground-truth API research
+   this session did for `DoRService` (real AEM Forms Output Service /
+   Print-Web channel APIs) rather than assuming the interface shape. Budget
+   this as a real project phase, not an extension.
+4. **Decide `FormSubmissionService`'s fate.** It's an orphaned TODO stub no
+   longer referenced by `SignToDoRProcess`. Either implement its real HTTP
+   call and re-wire something to use it, or delete it — a stub that looks
+   like working code is a liability, as this session's audit of
+   `InteractiveCommunicationServiceTest` demonstrated.
+5. **Treat `SpecToCodeGenerator` as a component generator, not a form
+   generator.** Use it to cut boilerplate for custom field components; plan
+   on assembling actual form panels/layout/submission actions by hand in
+   AEM Forms Editor.
+6. **Reconcile the `bmad/` guides with reality.** Several BEAD/guide docs
+   (e.g. `interactive-communications-guide.md`) describe features as if
+   they're implemented. Since these are meant to brief an AI assistant
+   before it writes code, an aspirational doc read as fact will make the
+   next person's (or the next AI's) starting assumptions wrong in exactly
+   the way this session's audit found.
+
 ## Contributing
 
 1. Fork the repository
@@ -373,4 +424,6 @@ Apache License 2.0
 
 ---
 
-**Built for the AI-assisted development era.** Generate, iterate, deploy faster.
+**Built for the AI-assisted development era.** Solid scaffolding for custom
+components and workflow patterns — real integrations (Sign, IC, external
+systems) are yours to build. See [Implementation Status](#implementation-status).
