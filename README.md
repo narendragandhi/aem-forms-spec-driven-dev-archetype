@@ -191,6 +191,58 @@ only, against a sibling top-level scalar field. The generated component
 isn't auto-wired into a submission handler. Good for the common case;
 extend `SpecToCodeGenerator` yourself for anything richer.
 
+### Generating a Complete Adaptive Form
+
+`SpecToCodeGenerator.generateForm(specPath, outputPath, appName)` is a
+separate capability from `generate()` above: instead of one reusable
+custom component, it produces a **complete Adaptive Form** — a real
+`cq:Page`/`guideContainer`/panel/field JCR structure, using AEM Forms'
+*standard* field components (text/number/email/date/dropdown/checkbox),
+not custom Sling-Model-backed ones. That's a deliberate choice: standard
+fields need no custom React component or `App.jsx` registration (every
+component `generate()` produces today is orphaned until you manually wire
+it into `App.jsx`'s `customMappings` — see above), and it matches how a
+human author actually builds a form in AEM Forms Editor.
+
+A whole-form spec uses a `"panels"` array instead of `generate()`'s single
+`"properties"` object — each panel's `properties`/`required` use the exact
+same JSON Schema handling:
+```json
+{
+  "title": "Employee Onboarding",
+  "panels": [
+    { "title": "Personal Details", "properties": {...}, "required": [...] },
+    { "title": "Emergency Contacts", "properties": {...}, "required": [...] }
+  ]
+}
+```
+See `specs/employee-onboarding.json` for a full worked example (two
+panels, a nested object, a repeatable object array). Generates to
+`ui.content/.../content/forms/af/<appName>/<slug>/.content.xml`.
+
+The real content shape (panels, `table`/`tablerow` for repeatable object
+fields) was verified against this archetype's own shipped
+`financial-application` sample, not assumed. **Deliberately scoped out
+this pass, rather than guessed at** — each of these either has no
+verified-real JCR shape or property name, or (submit action) the only real
+example found uses AEM's legacy guide-container format, incompatible with
+the Core Components format this generates:
+- Repeatable **scalar** arrays (only repeatable *object* arrays are
+  supported — the one real example is object-only). Fails fast with a
+  clear error rather than emit a guessed structure.
+- `visibleWhen` conditional visibility (no verified Core Components
+  property for it).
+- Validation constraints beyond `required` (minLength/pattern/minimum/etc.
+  — the real Core Components JCR property names for these weren't
+  verified).
+- A submit action — the generated form is structurally valid and
+  editable in AEM Forms Editor, but won't submit anywhere until this gets
+  its own ground-truth research pass (the same kind DoR/Sign/IC each got).
+- `dropdown`'s `date-input`/`drop-down` field type strings are AEM Forms
+  Core Components' documented identifiers, not independently verified
+  against a live instance in this pass (unlike `text-input`/`number-input`,
+  which are directly confirmed from the shipped sample).
+
 ## Document of Record (DoR) Generation
 
 `SignToDoRProcess` (`core/.../workflows/SignToDoRProcess.java`) is an AEM

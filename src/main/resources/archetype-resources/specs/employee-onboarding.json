@@ -1,0 +1,49 @@
+{
+  "title": "Employee Onboarding",
+  "panels": [
+    {
+      "title": "Personal Details",
+      "properties": {
+        "fullName": { "type": "string", "title": "Full Name" },
+        "email": { "type": "string", "title": "Email", "format": "email" },
+        "startDate": { "type": "string", "title": "Start Date", "format": "date" },
+        "department": {
+          "type": "string",
+          "title": "Department",
+          "enum": ["Engineering", "Sales", "Support"]
+        },
+        "homeAddress": {
+          "type": "object",
+          "title": "Home Address",
+          "properties": {
+            "street": { "type": "string", "title": "Street" },
+            "city": { "type": "string", "title": "City" },
+            "zipCode": { "type": "string", "title": "Zip Code" }
+          },
+          "required": ["street", "city"]
+        }
+      },
+      "required": ["fullName", "email", "startDate"]
+    },
+    {
+      "title": "Emergency Contacts",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "title": "Emergency Contacts",
+          "itemTitle": "Contact",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "title": "Name" },
+              "relationship": { "type": "string", "title": "Relationship" },
+              "phone": { "type": "string", "title": "Phone", "format": "tel" }
+            },
+            "required": ["name", "phone"]
+          }
+        }
+      },
+      "required": ["contacts"]
+    }
+  ]
+}

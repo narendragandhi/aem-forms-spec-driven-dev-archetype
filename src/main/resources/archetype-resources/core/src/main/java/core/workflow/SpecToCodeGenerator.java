@@ -122,6 +122,103 @@ public class SpecToCodeGenerator {
         LOG.info("Spec-to-Code Generation completed for: {}", specPath);
     }
 
+    /**
+     * Generates a complete, real Adaptive Form (a cq:Page with a
+     * guideContainer/rootPanel/panels/fields JCR structure, using AEM Forms'
+     * standard field components) from a whole-form spec — distinct from
+     * {@link #generate}, which produces one reusable custom component.
+     *
+     * <p>A whole-form spec has a top-level {@code "panels"} array instead of
+     * a single {@code "properties"} object; each panel's own {@code
+     * "properties"}/{@code "required"} are parsed with the exact same logic
+     * a single-component spec's fields already go through.
+     *
+     * <p>Deliberately scoped: repeatable scalar-array fields and {@code
+     * visibleWhen} are not supported for whole-form generation (no verified
+     * real JCR shape for either was established for the Core Components
+     * format this generates against) and fail the whole generation with a
+     * clear error rather than emit a guessed structure. Constraint
+     * properties beyond {@code required} (minLength/pattern/minimum/etc.)
+     * and a submit action are not emitted this pass either — see README.
+     *
+     * @param specPath path to a whole-form spec file (title, panels[]: {title, properties, required})
+     * @param outputPath root of the target project (contains ui.content/)
+     * @param appName AEM app name the generated page is placed under
+     *                (content/forms/af/&lt;appName&gt;/&lt;slug&gt;)
+     */
+    public void generateForm(String specPath, String outputPath, String appName) throws IOException {
+        LOG.info("Invoking Spec-to-Code Form Generator for spec: {} to output path: {}", specPath, outputPath);
+
+        Path spec = Paths.get(specPath);
+        JsonNode root = MAPPER.readTree(spec.toFile());
+
+        String title = root.hasNonNull("title") ? root.get("title").asText() : spec.getFileName().toString();
+        List<SpecPanel> panels = readPanels(root, specPath);
+        if (panels.isEmpty()) {
+            throw new IOException("Form spec has no 'panels' to generate from: " + specPath);
+        }
+        validateForFormGeneration(panels, specPath);
+
+        String slug = toKebabCase(toComponentName(title));
+        Path out = Paths.get(outputPath);
+
+        Path pageFile = writeFormContent(out, appName, slug, title, panels);
+        LOG.info("Generated Adaptive Form: {}", pageFile);
+        LOG.info("Spec-to-Code Form Generation completed for: {}", specPath);
+    }
+
+    private List<SpecPanel> readPanels(JsonNode root, String specPath) throws IOException {
+        List<SpecPanel> panels = new ArrayList<>();
+        JsonNode panelsNode = root.get("panels");
+        if (panelsNode == null || !panelsNode.isArray()) {
+            return panels;
+        }
+        for (JsonNode panelNode : panelsNode) {
+            String panelTitle = panelNode.hasNonNull("title") ? panelNode.get("title").asText() : "Panel";
+            List<SpecField> fields = readFields(panelNode.get("properties"), requiredNames(panelNode), panelTitle);
+            if (fields.isEmpty()) {
+                throw new IOException("Panel '" + panelTitle + "' in " + specPath + " has no 'properties' to generate from");
+            }
+            panels.add(new SpecPanel(panelTitle, fields));
+        }
+        return panels;
+    }
+
+    // Fails fast on spec shapes this pass doesn't generate a verified-real
+    // JCR structure for, rather than guess: repeatable scalar arrays (no
+    // real example of that shape was found) and visibleWhen (no verified
+    // Core Components conditional-visibility property). rejectNestedContainers
+    // (already applied by readFields/readPanels) guarantees a nested
+    // OBJECT's own children are scalar-only, so checking one level into
+    // OBJECT/ARRAY_OBJECT children is sufficient - ARRAY_SCALAR/visibleWhen
+    // can't appear any deeper than that.
+    private void validateForFormGeneration(List<SpecPanel> panels, String specPath) throws IOException {
+        for (SpecPanel panel : panels) {
+            for (SpecField f : panel.fields) {
+                checkFieldSupportedForFormGeneration(f, panel.title, specPath);
+                List<SpecField> nested = f.kind == FieldKind.OBJECT || f.kind == FieldKind.ARRAY_OBJECT ? f.children : null;
+                if (nested != null) {
+                    for (SpecField child : nested) {
+                        checkFieldSupportedForFormGeneration(child, panel.title, specPath);
+                    }
+                }
+            }
+        }
+    }
+
+    private void checkFieldSupportedForFormGeneration(SpecField f, String panelTitle, String specPath) throws IOException {
+        if (f.kind == FieldKind.ARRAY_SCALAR) {
+            throw new IOException("Field '" + f.name + "' in panel '" + panelTitle + "' (" + specPath
+                    + ") is a repeatable scalar array, which whole-form generation doesn't support yet "
+                    + "(no verified real Adaptive Form JCR shape for it) - remove it or model it as a single field");
+        }
+        if (f.visibleWhen != null) {
+            throw new IOException("Field '" + f.name + "' in panel '" + panelTitle + "' (" + specPath
+                    + ") uses visibleWhen, which whole-form generation doesn't support yet "
+                    + "(no verified real Adaptive Form conditional-visibility property) - remove it");
+        }
+    }
+
     // --- spec parsing -------------------------------------------------------
 
     private enum FieldKind { SCALAR, OBJECT, ARRAY_SCALAR, ARRAY_OBJECT }
@@ -143,6 +240,19 @@ public class SpecToCodeGenerator {
         VisibleWhen(String field, String equalsValue) {
             this.field = field;
             this.equalsValue = equalsValue;
+        }
+    }
+
+    // A whole-form spec's top-level "panels" entry — its own title plus the
+    // fields parsed via the exact same readFields/readConstraints logic a
+    // single-component spec's "properties" already goes through.
+    private static final class SpecPanel {
+        final String title;
+        final List<SpecField> fields;
+
+        SpecPanel(String title, List<SpecField> fields) {
+            this.title = title;
+            this.fields = fields;
         }
     }
 
@@ -725,6 +835,185 @@ public class SpecToCodeGenerator {
 
     private String htlStringEscape(String s) {
         return s.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    // --- Adaptive Form (complete form) content.xml ---------------------------
+
+    // Real shape verified this session against the shipped financial-application
+    // sample: cq:Page -> jcr:content (cq:PageContent) -> guideContainer ->
+    // rootPanel -> items -> panels -> items -> fields. cq:template points at
+    // the real, existing page-content template (a generic WCM template - it
+    // carries no AEM-Forms-specific policies; the sample's own
+    // "standard-application" template reference is a pre-existing dangling
+    // reference in this archetype's shipped content, not something to copy).
+    private Path writeFormContent(Path out, String appName, String slug, String title, List<SpecPanel> panels) throws IOException {
+        Path pageDir = out.resolve("ui.content/src/main/content/jcr_root/content/forms/af/" + appName + "/" + slug);
+        Files.createDirectories(pageDir);
+
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.append("<jcr:root xmlns:sling=\"http://sling.apache.org/jcr/sling/1.0\" xmlns:jcr=\"http://www.jcp.org/jcr/1.0\" xmlns:cq=\"http://www.day.com/jcr/cq/1.0\" xmlns:nt=\"http://www.jcp.org/jcr/nt/1.0\"\n");
+        xml.append("    jcr:primaryType=\"cq:Page\">\n");
+        xml.append("    <jcr:content\n");
+        xml.append("        cq:template=\"/conf/").append(appName).append("/settings/wcm/templates/page-content\"\n");
+        xml.append("        jcr:primaryType=\"cq:PageContent\"\n");
+        xml.append("        jcr:title=\"").append(xmlEscape(title)).append("\"\n");
+        xml.append("        sling:resourceType=\"").append(appName).append("/components/adaptiveForm/page\"\n");
+        xml.append("        guideComponentType=\"fd/af/components/page\">\n");
+        xml.append("        <guideContainer\n");
+        xml.append("            jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append("            sling:resourceType=\"").append(appName).append("/components/adaptiveForm/formcontainer\"\n");
+        xml.append("            editable=\"{Boolean}true\"\n");
+        xml.append("            guideNodeClass=\"guideContainerNode\">\n");
+        xml.append("            <rootPanel\n");
+        xml.append("                jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append("                sling:resourceType=\"").append(appName).append("/components/adaptiveForm/panel\"\n");
+        xml.append("                name=\"rootPanel\"\n");
+        xml.append("                paneltype=\"simple\"\n");
+        xml.append("                layout=\"wizard\">\n");
+        xml.append("                <items jcr:primaryType=\"nt:unstructured\">\n");
+        for (SpecPanel panel : panels) {
+            String panelName = decapitalize(toComponentName(panel.title)) + "Panel";
+            xml.append("                    <").append(panelName).append("\n");
+            xml.append("                        jcr:primaryType=\"nt:unstructured\"\n");
+            xml.append("                        sling:resourceType=\"").append(appName).append("/components/adaptiveForm/panel\"\n");
+            xml.append("                        name=\"").append(panelName).append("\"\n");
+            xml.append("                        jcr:title=\"").append(xmlEscape(panel.title)).append("\"\n");
+            xml.append("                        layout=\"responsiveGrid\">\n");
+            xml.append("                        <items jcr:primaryType=\"nt:unstructured\">\n");
+            for (SpecField f : panel.fields) {
+                appendFormField(xml, f, appName, "                            ");
+            }
+            xml.append("                        </items>\n");
+            xml.append("                    </").append(panelName).append(">\n");
+        }
+        xml.append("                </items>\n");
+        xml.append("            </rootPanel>\n");
+        xml.append("        </guideContainer>\n");
+        xml.append("    </jcr:content>\n");
+        xml.append("</jcr:root>\n");
+
+        Path pageFile = pageDir.resolve(".content.xml");
+        Files.write(pageFile, xml.toString().getBytes(StandardCharsets.UTF_8));
+        return pageFile;
+    }
+
+    private void appendFormField(StringBuilder xml, SpecField f, String appName, String indent) throws IOException {
+        switch (f.kind) {
+            case SCALAR: {
+                String resourceType = standardFieldResourceType(f.javaType, f.constraints);
+                String fieldType = standardFieldType(resourceType);
+                xml.append(indent).append('<').append(f.name).append('\n');
+                xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+                xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/").append(resourceType).append("\"\n");
+                xml.append(indent).append("    name=\"").append(f.name).append("\"\n");
+                xml.append(indent).append("    fieldType=\"").append(fieldType).append("\"\n");
+                xml.append(indent).append("    label=\"").append(xmlEscape(f.title)).append('"');
+                if (f.required) {
+                    xml.append("\n").append(indent).append("    required=\"{Boolean}true\"");
+                }
+                xml.append("/>\n");
+                break;
+            }
+            case OBJECT: {
+                xml.append(indent).append('<').append(f.name).append('\n');
+                xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+                xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/panel\"\n");
+                xml.append(indent).append("    name=\"").append(f.name).append("\"\n");
+                xml.append(indent).append("    jcr:title=\"").append(xmlEscape(f.title)).append("\"\n");
+                xml.append(indent).append("    layout=\"responsiveGrid\">\n");
+                xml.append(indent).append("    <items jcr:primaryType=\"nt:unstructured\">\n");
+                for (SpecField child : f.children) {
+                    appendFormField(xml, child, appName, indent + "        ");
+                }
+                xml.append(indent).append("    </items>\n");
+                xml.append(indent).append("</").append(f.name).append(">\n");
+                break;
+            }
+            case ARRAY_OBJECT: {
+                // Real repeatable pattern (verified against the shipped
+                // financial-application sample's employmentTable/row1): a
+                // table carrying min/maxOccur, with one authored tablerow
+                // as the repeating row template.
+                xml.append(indent).append('<').append(f.name).append('\n');
+                xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+                xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/table\"\n");
+                xml.append(indent).append("    name=\"").append(f.name).append("\"\n");
+                xml.append(indent).append("    jcr:title=\"").append(xmlEscape(f.title)).append("\"\n");
+                xml.append(indent).append("    initialRows=\"{Long}1\"\n");
+                xml.append(indent).append("    minOccur=\"{Long}").append(f.required ? 1 : 0).append("\"\n");
+                xml.append(indent).append("    maxOccur=\"{Long}10\">\n");
+                xml.append(indent).append("    <items jcr:primaryType=\"nt:unstructured\">\n");
+                xml.append(indent).append("        <row1\n");
+                xml.append(indent).append("            jcr:primaryType=\"nt:unstructured\"\n");
+                xml.append(indent).append("            sling:resourceType=\"").append(appName).append("/components/adaptiveForm/tablerow\"\n");
+                xml.append(indent).append("            name=\"row1\">\n");
+                xml.append(indent).append("            <items jcr:primaryType=\"nt:unstructured\">\n");
+                for (SpecField child : f.children) {
+                    appendFormField(xml, child, appName, indent + "                ");
+                }
+                xml.append(indent).append("            </items>\n");
+                xml.append(indent).append("        </row1>\n");
+                xml.append(indent).append("    </items>\n");
+                xml.append(indent).append("</").append(f.name).append(">\n");
+                break;
+            }
+            case ARRAY_SCALAR:
+                // Guarded against by validateForFormGeneration before this
+                // method is ever reached - defensive, not a real path.
+                throw new IOException("Repeatable scalar array field '" + f.name + "' reached appendFormField despite validation");
+        }
+    }
+
+    // Maps a field to a standard AEM Forms field component's resourceType
+    // leaf name (folders confirmed to exist under ui.apps/.../adaptiveForm/:
+    // textinput, numberinput, emailinput, datepicker, dropdown, checkbox).
+    // Pattern-matched from the two directly-confirmed real fieldType values
+    // (text-input, number-input) for the others - not independently
+    // verified per type against a live instance.
+    private String standardFieldResourceType(String javaType, Constraints c) {
+        if (!c.enumValues.isEmpty()) {
+            return "dropdown";
+        }
+        if ("Boolean".equals(javaType)) {
+            return "checkbox";
+        }
+        if ("Long".equals(javaType) || "Double".equals(javaType)) {
+            return "numberinput";
+        }
+        String format = c.format;
+        if ("email".equals(format)) {
+            return "emailinput";
+        }
+        if ("date".equals(format)) {
+            return "datepicker";
+        }
+        return "textinput";
+    }
+
+    // Paired with standardFieldResourceType rather than derived from it by
+    // string manipulation - resourceType leaf names don't share a uniform
+    // suffix (e.g. "datepicker", "dropdown" don't end in "input" the way
+    // "textinput"/"numberinput" do), so stripping/appending "-input" would
+    // silently produce wrong values for those. text-input/number-input are
+    // directly confirmed real fieldType values (from the shipped
+    // financial-application sample); the rest are AEM Forms Core
+    // Components' documented field type identifiers, not independently
+    // verified against a live instance this pass.
+    private String standardFieldType(String resourceType) {
+        switch (resourceType) {
+            case "textinput": return "text-input";
+            case "numberinput": return "number-input";
+            case "emailinput": return "email-input";
+            case "datepicker": return "date-input";
+            case "dropdown": return "drop-down";
+            case "checkbox": return "checkbox";
+            default: return "text-input";
+        }
+    }
+
+    private String decapitalize(String s) {
+        return s.isEmpty() ? s : Character.toLowerCase(s.charAt(0)) + s.substring(1);
     }
 
     // --- React component(s) --------------------------------------------------

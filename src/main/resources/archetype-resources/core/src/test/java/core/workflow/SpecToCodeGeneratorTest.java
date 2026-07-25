@@ -607,4 +607,174 @@ class SpecToCodeGeneratorTest {
         assertTrue(model.contains("for (String e : getMailingAddress().validate()) {"));
         assertTrue(model.contains("for (String e : dependentsItem.validate()) {"));
     }
+
+    // --- generateForm() (complete Adaptive Form) -----------------------------
+
+    private static final String ONBOARDING_FORM_SPEC = "{\n" +
+            "  \"title\": \"Employee Onboarding\",\n" +
+            "  \"panels\": [\n" +
+            "    {\n" +
+            "      \"title\": \"Personal Details\",\n" +
+            "      \"properties\": {\n" +
+            "        \"fullName\": { \"type\": \"string\", \"title\": \"Full Name\" },\n" +
+            "        \"email\": { \"type\": \"string\", \"title\": \"Email\", \"format\": \"email\" },\n" +
+            "        \"startDate\": { \"type\": \"string\", \"title\": \"Start Date\", \"format\": \"date\" },\n" +
+            "        \"department\": { \"type\": \"string\", \"title\": \"Department\", \"enum\": [\"Engineering\", \"Sales\"] },\n" +
+            "        \"homeAddress\": {\n" +
+            "          \"type\": \"object\", \"title\": \"Home Address\",\n" +
+            "          \"properties\": {\n" +
+            "            \"street\": { \"type\": \"string\", \"title\": \"Street\" },\n" +
+            "            \"city\": { \"type\": \"string\", \"title\": \"City\" }\n" +
+            "          },\n" +
+            "          \"required\": [\"street\"]\n" +
+            "        }\n" +
+            "      },\n" +
+            "      \"required\": [\"fullName\", \"email\", \"startDate\"]\n" +
+            "    },\n" +
+            "    {\n" +
+            "      \"title\": \"Emergency Contacts\",\n" +
+            "      \"properties\": {\n" +
+            "        \"contacts\": {\n" +
+            "          \"type\": \"array\", \"title\": \"Emergency Contacts\", \"itemTitle\": \"Contact\",\n" +
+            "          \"items\": {\n" +
+            "            \"type\": \"object\",\n" +
+            "            \"properties\": {\n" +
+            "              \"name\": { \"type\": \"string\", \"title\": \"Name\" },\n" +
+            "              \"phone\": { \"type\": \"string\", \"title\": \"Phone\" }\n" +
+            "            },\n" +
+            "            \"required\": [\"name\"]\n" +
+            "          }\n" +
+            "        }\n" +
+            "      },\n" +
+            "      \"required\": [\"contacts\"]\n" +
+            "    }\n" +
+            "  ]\n" +
+            "}\n";
+
+    private Path generatedFormXml(String appName, String slug) {
+        return tempDir.resolve("ui.content/src/main/content/jcr_root/content/forms/af/" + appName + "/" + slug + "/.content.xml");
+    }
+
+    @Test
+    void testGenerateFormCreatesPageWithGuideContainerAndPanels() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        Path pageFile = generatedFormXml("AcmeApp", "employee-onboarding");
+        assertTrue(Files.exists(pageFile), "Adaptive Form page should be generated");
+        String xml = Files.readString(pageFile);
+        assertTrue(xml.contains("jcr:primaryType=\"cq:Page\""));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/page\""));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/formcontainer\""));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/panel\""));
+        assertTrue(xml.contains("name=\"rootPanel\""));
+        assertTrue(xml.contains("cq:template=\"/conf/AcmeApp/settings/wcm/templates/page-content\""));
+    }
+
+    @Test
+    void testGenerateFormEmitsOnePanelNodePerSpecPanel() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("jcr:title=\"Personal Details\""));
+        assertTrue(xml.contains("jcr:title=\"Emergency Contacts\""));
+        assertTrue(xml.contains("<personalDetailsPanel"));
+        assertTrue(xml.contains("<emergencyContactsPanel"));
+    }
+
+    @Test
+    void testGenerateFormMapsFieldTypesToStandardResourceTypes() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("<fullName"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/textinput\""));
+        assertTrue(xml.contains("fieldType=\"text-input\""));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/emailinput\""));
+        assertTrue(xml.contains("fieldType=\"email-input\""));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/datepicker\""));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/dropdown\""));
+        assertTrue(xml.contains("required=\"{Boolean}true\""));
+    }
+
+    @Test
+    void testGenerateFormEmitsNestedObjectAsPanel() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("<homeAddress"));
+        assertTrue(xml.contains("jcr:title=\"Home Address\""));
+        assertTrue(xml.contains("<street"));
+        assertTrue(xml.contains("<city"));
+    }
+
+    @Test
+    void testGenerateFormEmitsRepeatableObjectArrayAsTable() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("<contacts"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/table\""));
+        assertTrue(xml.contains("minOccur=\"{Long}1\""), "contacts is required -> minOccur 1");
+        assertTrue(xml.contains("<row1"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/tablerow\""));
+        assertTrue(xml.contains("<name"));
+        assertTrue(xml.contains("<phone"));
+    }
+
+    @Test
+    void testGenerateFormFailsFastOnRepeatableScalarArray() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Bad Form\",\n" +
+                "  \"panels\": [{\n" +
+                "    \"title\": \"Panel\",\n" +
+                "    \"properties\": {\n" +
+                "      \"tags\": { \"type\": \"array\", \"title\": \"Tags\", \"items\": { \"type\": \"string\" } }\n" +
+                "    }\n" +
+                "  }]\n" +
+                "}\n";
+        Path specFile = writeSpec("bad-form.json", spec);
+
+        IOException e = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp"));
+        assertTrue(e.getMessage().contains("tags"));
+        assertTrue(e.getMessage().contains("repeatable scalar array"));
+    }
+
+    @Test
+    void testGenerateFormFailsFastOnVisibleWhen() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Bad Form\",\n" +
+                "  \"panels\": [{\n" +
+                "    \"title\": \"Panel\",\n" +
+                "    \"properties\": {\n" +
+                "      \"maritalStatus\": { \"type\": \"string\", \"title\": \"Marital Status\" },\n" +
+                "      \"spouseName\": { \"type\": \"string\", \"title\": \"Spouse Name\", \"visibleWhen\": { \"field\": \"maritalStatus\", \"equals\": \"Married\" } }\n" +
+                "    }\n" +
+                "  }]\n" +
+                "}\n";
+        Path specFile = writeSpec("bad-form-vw.json", spec);
+
+        IOException e = assertThrows(IOException.class,
+                () -> specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp"));
+        assertTrue(e.getMessage().contains("spouseName"));
+        assertTrue(e.getMessage().contains("visibleWhen"));
+    }
+
+    @Test
+    void testGenerateFormThrowsWhenNoPanels() throws IOException {
+        Path specFile = writeSpec("no-panels.json", "{\"title\": \"Empty\"}\n");
+
+        assertThrows(IOException.class,
+                () -> specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp"));
+    }
 }
