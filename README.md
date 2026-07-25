@@ -13,7 +13,7 @@ code versus scaffolding you'd still need to build.
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Stub** | Logs and returns; the `// TODO: Replace with a real HTTP client call` in the source is accurate. Not currently referenced by `SignToDoRProcess`. |
-| Interactive Communications | **Not implemented** | No `InteractiveCommunicationService` class exists anywhere in the codebase. There is real sample DAM content (fragments, IC template folders) but no service to render anything from it — see [Interactive Communications (IC)](#interactive-communications-ic). |
+| Interactive Communications | **Real, not live-tested** | `InteractiveCommunicationServiceImpl` calls the real `PrintChannelRenderService` (verified via `javap`), Print Channel only. Its own OSGi component was `unsatisfied` (feature-toggle-gated) on the instance this was built against — check yours before relying on it. See [Interactive Communications (IC)](#interactive-communications-ic). |
 
 ## Why Use This Archetype?
 
@@ -292,34 +292,76 @@ to a live API call whenever nothing's been recorded via webhook.
 
 ## Interactive Communications (IC)
 
-**Not implemented.** There is no `InteractiveCommunicationService` class,
-or any other service, anywhere in this codebase. What does exist is sample
-DAM content — reusable document fragments and two example IC content nodes
-— which is real, inspectable content modeling, but nothing renders it into
-an actual document.
+`InteractiveCommunicationServiceImpl` calls the real AEM Forms
+`PrintChannelRenderService` (`com.adobe.aem.forms.ic.print.api`) to render
+an Interactive Communication's Print Channel as a PDF, merged with
+customer data. Request/response shapes were verified via `javap` against
+the pinned SDK jar, not assumed from the package name.
+`InteractiveCommunicationServlet` (`GET /bin/bmad/interactive-communication?icPath=...&customerId=...`)
+gives it a real, reachable entry point rather than leaving it an orphaned
+service (the mistake `FormSubmissionService` made).
 
-### What actually exists
+### A real, load-bearing finding: this API may not activate on your instance
 
-| Asset Type | Location | Description |
-|------------|----------|-------------|
-| **Document Fragments** | `/content/dam/formsanddocuments/fragments/${appName}/` | Reusable content blocks (`header`, `footer`, `terms-and-conditions`, `customer-details`) — real JCR content, no rendering logic. |
-| **Sample IC content nodes** | `/content/dam/formsanddocuments/ic/${appName}/` | `account-statement`, `welcome-kit` — placeholder content nodes, not functioning Interactive Communications. |
-| **OSGi Configs** | `ui.config/` | Output Service / Document Merge configuration exists, but nothing in `core/` calls it for IC generation. |
+On the instance this was built against, `PrintChannelRenderServiceImpl`'s
+own OSGi component is in state **`unsatisfied (reference)`** — one of
+*its* dependencies is a `ToggleCondition` gated on `toggle.name=FT_FORMS-14262`,
+which isn't even registered in that instance's toggle console (not
+disabled — not provisioned at all). Check yours before relying on this:
 
-### If you need real IC
+```
+curl -u admin:admin http://localhost:4502/system/console/components.json \
+  | grep -A2 PrintChannelRenderServiceImpl
+```
 
-Building `InteractiveCommunicationService` is a real, scoped project of its
-own — the same kind of ground-truth API verification this session did for
-`DoRService` (real AEM Forms Output Service APIs, a real Form Data Model
-data source, real Print/Web channel rendering) would need to happen before
-writing the calling code. The content structure above is a reasonable
-starting point for the DAM layout; the service layer needs to be built from
-scratch.
+If it says anything other than `"state": "active"`,
+`InteractiveCommunicationServiceImpl` won't activate either —
+`printChannelRenderService` is a mandatory `@Reference`, so this fails
+loudly (the component simply won't come up) rather than silently doing
+nothing. A more general service, `com.adobe.fd.output.api.OutputService`,
+is verified **active** on the same instance and could achieve a similar
+template+data→PDF outcome without this gate, if you hit the same wall and
+want a fallback.
+
+### Data source
+
+Customer data comes from a real HTTP GET to a configurable endpoint
+(`customer_data_endpoint` in `InteractiveCommunicationServiceImpl.Config`,
+default the archetype's own `MockFinanceDataServlet` at
+`/bin/bmad/mock-finance-data`) — reusing the exact endpoint the README's
+own "Form Data Models: REST Customer API" row already pointed at, rather
+than inventing a new one.
+
+### What's not covered yet
+
+- **Web Channel** rendering (`renderPrint`, HTML output) — only the Print
+  Channel PDF path (`renderPdf`) is implemented.
+- **Letterhead** — `renderPdf`'s second `Document` parameter (branded
+  overlay content) is passed as `null`. The real expected content shape
+  for it isn't verified against a live instance; guessing at it felt worse
+  than leaving it out and saying so.
+- **Prefill** — `IcPdfRenderOptions.setPrefill(...)` (a named server-side
+  data-prefill hook) exists in the real API but its semantics aren't
+  documented anywhere I could verify; left unset.
+- The shipped sample IC content
+  (`ui.content/.../formsanddocuments/ic/${appName}/account-statement`) is
+  a placeholder `dam:Asset` shell — `printChannelEnabled=true` and a
+  `templatePath` pointing at content that doesn't actually exist. Whether
+  `renderPdf` needs a fuller guideContainer-style structure there (like an
+  Adaptive Form) is one of the things only a live, toggle-enabled instance
+  can confirm.
+
+**Honesty note**, same bar as Adobe Sign: verified via `javap` against the
+real SDK and mocked in tests (including a real gotcha caught along the
+way — `com.adobe.aemfd.docmanager.Document`'s constructors delegate to a
+static `DocumentFactory` singleton that's `null` outside a live AEM
+runtime, so tests install a minimal in-memory one rather than skip the
+issue). Not run against a live, toggle-enabled AEM Forms instance.
 
 `bmad/06-Integrations/interactive-communications-guide.md` describes the
-intended architecture (Print/Web channel split, FDM data sourcing) — read
-it as a design sketch to build against, not documentation of something
-already working.
+broader intended architecture (Web Channel, FDM data sourcing beyond the
+mock endpoint) — read it as a design sketch for what's still to build, not
+documentation of something already fully working.
 
 > See `bmad/00-Project-Initialization/forms-version-compatibility.md` for AFaaCS vs 6.5 guidance.
 
@@ -433,11 +475,14 @@ project — each of these is a real gap, not a nice-to-have:
    dance) and run a real signature round-trip before trusting this in
    anything beyond a demo — mocked-against-docs and proven-against-a-real-
    account are different bars.
-3. **Scope and build `InteractiveCommunicationService` from scratch** if IC
-   is actually part of your project — do the same ground-truth API research
-   this session did for `DoRService` (real AEM Forms Output Service /
-   Print-Web channel APIs) rather than assuming the interface shape. Budget
-   this as a real project phase, not an extension.
+3. **Check whether `PrintChannelRenderServiceImpl` is actually active on
+   your instance** (see [Interactive Communications](#interactive-communications-ic)
+   for the exact check) before relying on `InteractiveCommunicationServiceImpl`
+   — it was feature-toggle-gated and unsatisfied on the instance this was
+   built against. If it's gated on yours too, either get the toggle
+   enabled or fall back to `OutputService`, which is verified active.
+   Web Channel rendering, letterhead, and prefill are still unbuilt even
+   once Print Channel PDF generation itself is proven live.
 4. **Decide `FormSubmissionService`'s fate.** It's an orphaned TODO stub no
    longer referenced by `SignToDoRProcess`. Either implement its real HTTP
    call and re-wire something to use it, or delete it — a stub that looks
@@ -469,6 +514,7 @@ Apache License 2.0
 ---
 
 **Built for the AI-assisted development era.** Solid scaffolding for custom
-components and workflow patterns. Adobe Sign is a real integration verified
-against Adobe's docs but not yet a live account; IC and other external
-systems are still yours to build. See [Implementation Status](#implementation-status).
+components and workflow patterns. Adobe Sign and Interactive Communications
+are real integrations verified against Adobe's own APIs, neither yet
+proven on a live/fully-entitled instance; other external systems are still
+yours to build. See [Implementation Status](#implementation-status).

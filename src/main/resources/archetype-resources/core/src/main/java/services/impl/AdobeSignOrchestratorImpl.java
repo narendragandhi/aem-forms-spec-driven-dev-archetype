@@ -37,7 +37,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * a real Adobe Sign account in this session — see README for what to verify with real
  * credentials.
  */
-@Component(service = AdobeSignOrchestrator.class)
+// Registered under both types: AdobeSignOrchestrator for regular callers,
+// and this concrete class so AdobeSignWebhookServlet (a different package)
+// can @Reference it directly for recordWebhookStatus()/getClientId() -
+// intentionally not on the public interface (see its own javadoc). Caught
+// live: without the concrete type here, that @Reference resolves to
+// nothing and the webhook servlet's own component never activates.
+@Component(service = {AdobeSignOrchestrator.class, AdobeSignOrchestratorImpl.class})
 @Designate(ocd = AdobeSignOrchestratorImpl.Config.class)
 public class AdobeSignOrchestratorImpl implements AdobeSignOrchestrator {
 
