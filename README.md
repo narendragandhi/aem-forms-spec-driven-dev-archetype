@@ -11,7 +11,7 @@ code versus scaffolding you'd still need to build.
 |---|---|---|
 | `SpecToCodeGenerator` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec. Verified via real compile/deploy. Scaffolds custom field *components*, not whole forms — you still assemble panels/layout/submission actions in AEM Forms Editor. |
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
-| `AdobeSignOrchestrator` | **Simulated** | `AdobeSignOrchestratorImpl` is an in-memory map that fabricates an agreement ID and auto-flips it to `SIGNED` after a timeout. No HTTP calls, no real Adobe Sign API usage. Real interface contract, no real integration — see [Adobe Sign Integration](#adobe-sign-integration-simulated). |
+| `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Stub** | Logs and returns; the `// TODO: Replace with a real HTTP client call` in the source is accurate. Not currently referenced by `SignToDoRProcess`. |
 | Interactive Communications | **Not implemented** | No `InteractiveCommunicationService` class exists anywhere in the codebase. There is real sample DAM content (fragments, IC template folders) but no service to render anything from it — see [Interactive Communications (IC)](#interactive-communications-ic). |
 
@@ -194,12 +194,16 @@ extend `SpecToCodeGenerator` yourself for anything richer.
 ## Document of Record (DoR) Generation
 
 `SignToDoRProcess` (`core/.../workflows/SignToDoRProcess.java`) is an AEM
-Workflow step that, once `AdobeSignOrchestrator` reports an agreement as
-`SIGNED`, calls the real AEM Forms `DoRService` to render the submitted
-Adaptive Form into a PDF Document of Record and stores it as a DAM asset
-(path recorded in the workflow's `dorAssetPath` metadata; failures are
-tracked as `dorStatus=FAILED` rather than aborting the workflow, since
-signing already succeeded).
+Workflow step with two stages. First, it renders a **pre-signature draft**
+of the submitted Adaptive Form via the real AEM Forms `DoRService` and
+sends that PDF to Adobe Sign for signature. Once `AdobeSignOrchestrator`
+reports the agreement as `SIGNED`, it downloads the **actually-signed
+document** (with Adobe Sign's audit trail) and stores that as the DAM
+asset that becomes the real Document of Record — not a second re-render of
+the draft. Failures at either stage are tracked as `signingStatus=FAILED`
+or `dorStatus=FAILED` (with the real exception logged) rather than
+aborting the workflow, since a transient failure at either stage should be
+retryable.
 
 `DoRService.render()` has real prerequisites beyond the Adaptive Form
 itself — verified against the real API and a real running instance, not
@@ -230,23 +234,61 @@ via `dor_locale`, `adaptive_form_path`, and `dor_storage_path` (OSGi config
 for `SignToDoRProcess.Config`), and ensure the target form has the DAM
 metadata/template setup above before expecting a generated PDF.
 
-## Adobe Sign Integration (Simulated)
+## Adobe Sign Integration
 
-`SignToDoRProcess` calls `AdobeSignOrchestrator.createAgreement()` /
-`.getStatus()` to drive its signing step, but the shipped
-`AdobeSignOrchestratorImpl` **does not call Adobe Sign at all**. It's an
-in-memory `ConcurrentHashMap` that fabricates an agreement ID and flips its
-own status from `OUT_FOR_SIGNATURE` to `SIGNED` after a fixed timeout
-(`signingTimeoutMs`, 30s by default). It exists so the workflow shape and
-`SignToDoRProcess`'s DoR-on-signed logic can be built and tested without a
-real Adobe Sign account.
+`AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6: it
+uploads a document as a transient document, creates an agreement for
+signature, checks status (or picks up a webhook-recorded status without an
+extra call), and downloads the fully signed document with audit trail.
+Request/response shapes were verified against Adobe's own developer docs
+(`developer.adobe.com/acrobat-sign`, `github.com/AdobeDocs/adobe-sign`) —
+not assumed from a training-data guess.
 
-The interface (`AdobeSignOrchestrator.createAgreement(String data)`,
-`.getStatus(String agreementId)`) is a reasonable contract to implement
-against, but treat it purely as a contract — implementing the real Adobe
-Sign REST API calls (agreement creation, webhook or polling-based status
-updates, credential/OAuth handling) is work this archetype does not do for
-you.
+**Honesty note**: this has not been tested against a real Adobe Sign
+account. It's verified by mocking `java.net.http.HttpClient` against those
+documented request/response shapes, plus a full compile — the same bar as
+everything else in this archetype, but *not* a live signature round-trip.
+If you have Adobe Developer Console access, the fastest way to actually
+prove it end-to-end is the Integration Key path below against a trial
+account.
+
+### Configuration (`AdobeSignOrchestratorImpl.Config`, OSGi)
+
+| Attribute | Type | Purpose |
+|---|---|---|
+| `integration_key` | password | Fast path for dev/test: a static bearer token from Adobe Sign's own UI (Account > Personal Preferences > API). If set, used directly — no OAuth flow needed. |
+| `client_id` / `client_secret` / `refresh_token` | string / password / password | Production OAuth path. `refresh_token` can only be obtained via a one-time *interactive* authorization (see below) — the code only ever refreshes it, never generates it. |
+| `token_endpoint` | string | Adobe Sign OAuth token endpoint. Defaults to the real one; override only if Adobe changes it or you're on a non-standard environment. |
+| `base_uris_endpoint` | string | Used to discover your account's region-specific API host (`api.na2.adobesign.com`, etc.) — accounts aren't all on the same shard, so this is looked up at runtime rather than hardcoded. |
+
+`client_secret`, `refresh_token`, and `integration_key` are OSGi
+`PASSWORD`-typed attributes — AEM's Web Console encrypts them automatically
+(the standard mechanism, no custom secret handling in this code).
+
+### One-time OAuth bootstrap (production path)
+
+A `refresh_token` cannot be generated by any code — it requires a human to
+approve access in a browser once:
+
+1. Register an OAuth application in Adobe's [developer console](https://secure.na1.adobesign.com/public/static/oauthDoc.jsp)
+   with scopes `agreement_write`, `agreement_read`, `webhook_write`.
+2. Send a real user to the authorization URL (`https://secure.adobesign.com/public/oauth/v2?...&response_type=code&client_id=...`);
+   after they approve, Adobe redirects back with a `code` query parameter.
+3. Exchange that code once for a `refresh_token` (`grant_type=authorization_code`
+   against the token endpoint above) and paste the result into
+   `refresh_token` in this component's OSGi config. It's long-lived; the
+   code handles ongoing access-token refresh from there.
+
+### Webhooks
+
+`AdobeSignWebhookServlet` (`/bin/bmad/adobe-sign-webhook`) receives
+real-time status updates instead of relying solely on polling — it
+handles Adobe's `X-ADOBESIGN-CLIENTID` verification handshake and records
+incoming status changes so `getStatus()` can skip an API call. **This
+endpoint must be a publicly reachable HTTPS URL for Adobe to deliver
+events to it** — a local/dev AEM instance needs a tunnel (e.g. `ngrok`) to
+receive real webhooks. Nothing breaks without one: `getStatus()` falls back
+to a live API call whenever nothing's been recorded via webhook.
 
 ## Interactive Communications (IC)
 
@@ -384,11 +426,13 @@ project — each of these is a real gap, not a nice-to-have:
    local/target AEM instance's native XFA rendering SDK actually starts
    (`error.log` for `IllegalStateException: Error getting shared temp
    directory`) — DoR generation is silently dead in the water otherwise.
-2. **Implement real Adobe Sign integration**, or drop the pretense that one
-   exists. `AdobeSignOrchestratorImpl` is a timer-based simulator — replace
-   it with real Adobe Sign REST API calls (agreement creation, OAuth/API
-   key handling, and either webhook or polling-based status updates) before
-   relying on `SignToDoRProcess` for anything beyond a demo.
+2. **Get real credentials and prove out Adobe Sign end-to-end.**
+   `AdobeSignOrchestratorImpl` now makes real API calls (verified against
+   Adobe's docs, mocked in tests) but has never hit a live account. Get an
+   Integration Key from a trial Adobe Sign account (fastest path, no OAuth
+   dance) and run a real signature round-trip before trusting this in
+   anything beyond a demo — mocked-against-docs and proven-against-a-real-
+   account are different bars.
 3. **Scope and build `InteractiveCommunicationService` from scratch** if IC
    is actually part of your project — do the same ground-truth API research
    this session did for `DoRService` (real AEM Forms Output Service /
@@ -425,5 +469,6 @@ Apache License 2.0
 ---
 
 **Built for the AI-assisted development era.** Solid scaffolding for custom
-components and workflow patterns — real integrations (Sign, IC, external
-systems) are yours to build. See [Implementation Status](#implementation-status).
+components and workflow patterns. Adobe Sign is a real integration verified
+against Adobe's docs but not yet a live account; IC and other external
+systems are still yours to build. See [Implementation Status](#implementation-status).

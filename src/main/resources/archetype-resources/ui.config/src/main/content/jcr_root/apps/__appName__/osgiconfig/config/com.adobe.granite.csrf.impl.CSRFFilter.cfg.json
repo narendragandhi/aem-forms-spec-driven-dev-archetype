@@ -2,6 +2,7 @@
   "filter.methods": ["POST","PUT","DELETE"],
   "excluded.urls": [
     "/libs/granite/csrf/token.json",
-    "/system/sling/login"
+    "/system/sling/login",
+    "/bin/bmad/adobe-sign-webhook"
   ]
 }

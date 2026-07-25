@@ -1,5 +1,6 @@
 package ${package}.workflows;
 
+import ${package}.services.AdobeSignException;
 import ${package}.services.AdobeSignOrchestrator;
 import com.adobe.aemds.guide.addon.dor.DoRGenerationException;
 import com.adobe.aemds.guide.addon.dor.DoROptions;
@@ -12,6 +13,8 @@ import com.adobe.granite.workflow.exec.WorkflowProcess;
 import com.adobe.granite.workflow.metadata.MetaDataMap;
 import com.day.cq.dam.api.Asset;
 import com.day.cq.dam.api.AssetManager;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.osgi.service.component.annotations.Activate;
@@ -25,8 +28,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Locale;
 
+/**
+ * On first execution, renders a pre-signature draft of the submitted
+ * Adaptive Form via the real DoRService and sends it to Adobe Sign for
+ * signature. On later executions, polls (or picks up a webhook-recorded)
+ * status; once SIGNED, downloads the actually-signed document (with audit
+ * trail) from Adobe Sign and stores that as the Document of Record - the
+ * final signed artifact, not a re-render of the pre-signature draft.
+ */
 @Component(
     service = WorkflowProcess.class,
     property = {
@@ -37,6 +49,7 @@ import java.util.Locale;
 public class SignToDoRProcess implements WorkflowProcess {
 
     private static final Logger LOG = LoggerFactory.getLogger(SignToDoRProcess.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @ObjectClassDefinition(
         name = "AEM Forms Sign-to-DoR Process Configuration",
@@ -45,7 +58,7 @@ public class SignToDoRProcess implements WorkflowProcess {
     public @interface Config {
         @AttributeDefinition(
             name = "Adaptive Form Path",
-            description = "The Adaptive Form resource rendered as the Document of Record.",
+            description = "The Adaptive Form resource rendered as the pre-signature draft.",
             type = AttributeType.STRING
         )
         String adaptive_form_path() default "/content/forms/af/${appName}/financial-application";
@@ -59,11 +72,18 @@ public class SignToDoRProcess implements WorkflowProcess {
 
         @AttributeDefinition(
             name = "Document of Record Locale",
-            description = "BCP 47 language tag (e.g. en, en-US) used to render the Document of Record. "
+            description = "BCP 47 language tag (e.g. en, en-US) used to render the pre-signature draft. "
                     + "DoRService.render() NPEs internally if DoROptions.locale is left unset.",
             type = AttributeType.STRING
         )
         String dor_locale() default "en";
+
+        @AttributeDefinition(
+            name = "Signer Email Field",
+            description = "The field name in the submitted form data JSON that holds the signer's email address.",
+            type = AttributeType.STRING
+        )
+        String signer_email_field() default "email";
     }
 
     @Reference
@@ -75,12 +95,14 @@ public class SignToDoRProcess implements WorkflowProcess {
     private String adaptiveFormPath;
     private String dorStoragePath;
     private Locale dorLocale;
+    private String signerEmailField;
 
     @Activate
     protected void activate(final Config config) {
         this.adaptiveFormPath = config.adaptive_form_path();
         this.dorStoragePath = config.dor_storage_path();
         this.dorLocale = Locale.forLanguageTag(config.dor_locale());
+        this.signerEmailField = config.signer_email_field();
     }
 
     @Override
@@ -92,16 +114,84 @@ public class SignToDoRProcess implements WorkflowProcess {
         String agreementId = wfMetadata.get("adobeSignAgreementId", String.class);
 
         if (agreementId == null) {
-            agreementId = signOrchestrator.createAgreement(payload);
+            sendForSignature(payload, workflowSession, wfMetadata);
+        } else {
+            checkStatusAndMaybeGenerateDoR(agreementId, workflowSession, wfMetadata);
+        }
+    }
+
+    // Renders a pre-signature draft (real DoRService call, same prerequisites
+    // documented in the README) and sends it to Adobe Sign. A failure here
+    // is tracked (signingStatus=FAILED) rather than thrown as a
+    // WorkflowException so a transient failure can be retried without
+    // aborting the whole workflow.
+    private void sendForSignature(String payload, WorkflowSession workflowSession, MetaDataMap wfMetadata) {
+        ResourceResolver resolver = workflowSession.adaptTo(ResourceResolver.class);
+        if (resolver == null) {
+            LOG.error("Could not adapt WorkflowSession to a ResourceResolver; cannot send document for signature");
+            wfMetadata.put("signingStatus", "FAILED");
+            return;
+        }
+
+        Resource formResource = resolver.getResource(adaptiveFormPath);
+        if (formResource == null) {
+            LOG.error("Adaptive Form not found at {}; cannot send document for signature", adaptiveFormPath);
+            wfMetadata.put("signingStatus", "FAILED");
+            return;
+        }
+
+        try {
+            byte[] draftPdf = renderDraft(formResource, payload);
+            String signerEmail = extractSignerEmail(payload);
+            String documentName = "DoR-Draft-" + System.currentTimeMillis() + ".pdf";
+
+            String agreementId = signOrchestrator.createAgreement(draftPdf, documentName, signerEmail);
             wfMetadata.put("adobeSignAgreementId", agreementId);
             wfMetadata.put("signingStatus", "OUT_FOR_SIGNATURE");
-        } else {
-            String status = signOrchestrator.getStatus(agreementId);
-            wfMetadata.put("signingStatus", status);
+            LOG.info("Sent document for signature, agreement: {}", agreementId);
+        } catch (DoRGenerationException | AdobeSignException e) {
+            LOG.error("Failed to send document for signature", e);
+            wfMetadata.put("signingStatus", "FAILED");
+        }
+    }
 
-            if ("SIGNED".equals(status)) {
-                generateDoR(payload, agreementId, workflowSession, wfMetadata);
-            }
+    private byte[] renderDraft(Resource formResource, String payload) throws DoRGenerationException {
+        DoROptions options = new DoROptions();
+        options.setFormResource(formResource);
+        options.setData(payload);
+        options.setLocale(dorLocale);
+
+        DoRResult result = doRService.render(options);
+        return result.getContent();
+    }
+
+    private String extractSignerEmail(String payloadJson) throws AdobeSignException {
+        JsonNode node;
+        try {
+            node = MAPPER.readTree(payloadJson);
+        } catch (IOException e) {
+            throw new AdobeSignException("Could not parse form submission payload as JSON to extract the signer email", e);
+        }
+        JsonNode value = node.get(signerEmailField);
+        if (value == null || value.asText().isBlank()) {
+            throw new AdobeSignException("Form submission payload has no non-blank \"" + signerEmailField + "\" field to use as the Adobe Sign signer email");
+        }
+        return value.asText();
+    }
+
+    private void checkStatusAndMaybeGenerateDoR(String agreementId, WorkflowSession workflowSession, MetaDataMap wfMetadata) {
+        String status;
+        try {
+            status = signOrchestrator.getStatus(agreementId);
+        } catch (AdobeSignException e) {
+            LOG.error("Failed to check signing status for agreement: {}", agreementId, e);
+            return;
+        }
+
+        wfMetadata.put("signingStatus", status);
+
+        if ("SIGNED".equals(status)) {
+            generateDoR(agreementId, workflowSession, wfMetadata);
         }
     }
 
@@ -110,36 +200,24 @@ public class SignToDoRProcess implements WorkflowProcess {
     // as a WorkflowException — that would abort the whole workflow over a
     // step that can reasonably be retried, for a document whose source
     // agreement is already signed.
-    private void generateDoR(String payload, String agreementId, WorkflowSession workflowSession, MetaDataMap wfMetadata) {
-        LOG.info("Generating Document of Record for agreement: {}", agreementId);
+    private void generateDoR(String agreementId, WorkflowSession workflowSession, MetaDataMap wfMetadata) {
+        LOG.info("Fetching signed Document of Record for agreement: {}", agreementId);
 
         ResourceResolver resolver = workflowSession.adaptTo(ResourceResolver.class);
         if (resolver == null) {
-            LOG.error("Could not adapt WorkflowSession to a ResourceResolver; cannot generate Document of Record for agreement: {}", agreementId);
-            wfMetadata.put("dorStatus", "FAILED");
-            return;
-        }
-
-        Resource formResource = resolver.getResource(adaptiveFormPath);
-        if (formResource == null) {
-            LOG.error("Adaptive Form not found at {}; cannot generate Document of Record for agreement: {}", adaptiveFormPath, agreementId);
+            LOG.error("Could not adapt WorkflowSession to a ResourceResolver; cannot store Document of Record for agreement: {}", agreementId);
             wfMetadata.put("dorStatus", "FAILED");
             return;
         }
 
         try {
-            DoROptions options = new DoROptions();
-            options.setFormResource(formResource);
-            options.setData(payload);
-            options.setLocale(dorLocale);
-
-            DoRResult result = doRService.render(options);
-            String assetPath = saveDoR(resolver, agreementId, result.getContent());
+            byte[] signedPdf = signOrchestrator.getSignedDocument(agreementId);
+            String assetPath = saveDoR(resolver, agreementId, signedPdf);
 
             wfMetadata.put("dorStatus", "GENERATED");
             wfMetadata.put("dorAssetPath", assetPath);
-            LOG.info("Document of Record generated for agreement {}: {}", agreementId, assetPath);
-        } catch (DoRGenerationException e) {
+            LOG.info("Document of Record stored for agreement {}: {}", agreementId, assetPath);
+        } catch (AdobeSignException | DoRGenerationException e) {
             LOG.error("Document of Record generation failed for agreement: {}", agreementId, e);
             wfMetadata.put("dorStatus", "FAILED");
         }
