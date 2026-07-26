@@ -222,11 +222,39 @@ panels, a nested object, a repeatable object array). Generates to
 
 The real content shape (panels, `table`/`tablerow` for repeatable object
 fields) was verified against this archetype's own shipped
-`financial-application` sample, not assumed. **Deliberately scoped out
-this pass, rather than guessed at** — each of these either has no
-verified-real JCR shape or property name, or (submit action) the only real
-example found uses AEM's legacy guide-container format, incompatible with
-the Core Components format this generates:
+`financial-application` sample, not assumed.
+
+**Submit action, wired for real.** Generated forms carry
+`actionType="fd/af/components/guidesubmittype/restendpoint"` on the
+`guideContainer` plus a real submit button (`.../adaptiveForm/actions/submit`,
+`fieldType="button"`, `<fd:events click="[submitForm()]"/>`) in the last
+panel. This is genuinely different from — and better verified than — an
+earlier version of this doc, which claimed no compatible real example
+existed; that was based on an incomplete search. A broader one found a
+real, human-authored sample in the *same* Core Components resourceType
+family (`ui.content/.../templates/contact-us-form/initial/.content.xml`)
+using this exact `actionType` and button shape, independently corroborated
+by `actions/submit`'s own AEM Forms Editor dialog template. **Live-verified
+end to end**: deployed a generated form and POSTed a real submission to
+its action URL (read from the form's own `.model.json`,
+`/adobe/forms/af/submit/<id>`) — AEM returned `HTTP 200` with a
+`redirectUrl` pointing at the configured thank-you page, confirming a real
+submission was accepted and processed, not just that content renders. The
+POST body needs to be wrapped as `{"data": {...field values...}}` — a flat
+body (no `data` wrapper) gets a real `400 Incomplete request body`, which
+is itself how this was confirmed empirically rather than assumed. One
+honest gap remains: this proves the `actionType`+button combination
+*works*, not that `actionType` is strictly *necessary* — the framework
+already auto-provisions a submission endpoint on every `guideContainer`
+regardless of content (visible in `.model.json`'s `"action"` field even
+without this property), and isolating whether `actionType` changes
+anything versus being redundant wasn't tested. This
+framework-native submit path is separate from, and not integrated with,
+this archetype's own hand-rolled `HeadlessSubmitServlet`/React headless
+submission flow.
+
+**Deliberately scoped out this pass, rather than guessed at** — each of
+these has no verified-real JCR shape or property name found yet:
 - Repeatable **scalar** arrays (only repeatable *object* arrays are
   supported — the one real example is object-only). Fails fast with a
   clear error rather than emit a guessed structure.
@@ -235,9 +263,6 @@ the Core Components format this generates:
 - Validation constraints beyond `required` (minLength/pattern/minimum/etc.
   — the real Core Components JCR property names for these weren't
   verified).
-- A submit action — the generated form is structurally valid and
-  editable in AEM Forms Editor, but won't submit anywhere until this gets
-  its own ground-truth research pass (the same kind DoR/Sign/IC each got).
 - `dropdown`'s `date-input`/`drop-down` field type strings are AEM Forms
   Core Components' documented identifiers, not independently verified
   against a live instance in this pass (unlike `text-input`/`number-input`,

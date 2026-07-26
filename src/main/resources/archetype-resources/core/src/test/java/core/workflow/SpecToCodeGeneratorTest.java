@@ -732,6 +732,38 @@ class SpecToCodeGeneratorTest {
     }
 
     @Test
+    void testGenerateFormWiresRealSubmitAction() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("xmlns:fd=\"http://www.adobe.com/aemfd/fd/1.0\""));
+        assertTrue(xml.contains("actionType=\"fd/af/components/guidesubmittype/restendpoint\""));
+        assertTrue(xml.contains("thankYouOption=\"page\""));
+        assertTrue(xml.contains("<submitButton"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/actions/submit\""));
+        assertTrue(xml.contains("fieldType=\"button\""));
+        assertTrue(xml.contains("buttonType=\"submit\""));
+        assertTrue(xml.contains("click=\"[submitForm()]\""));
+    }
+
+    @Test
+    void testGenerateFormPlacesSubmitButtonInLastPanelOnly() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        int firstPanelEnd = xml.indexOf("</personalDetailsPanel>");
+        int secondPanelStart = xml.indexOf("<emergencyContactsPanel");
+        int submitButtonIndex = xml.indexOf("<submitButton");
+        assertTrue(firstPanelEnd > 0 && secondPanelStart > firstPanelEnd, "sanity check on panel ordering");
+        assertTrue(submitButtonIndex > secondPanelStart, "submit button should be inside the last panel, not the first");
+        assertEquals(1, xml.split("<submitButton", -1).length - 1, "exactly one submit button should be generated");
+    }
+
+    @Test
     void testGenerateFormFailsFastOnRepeatableScalarArray() throws IOException {
         String spec = "{\n" +
                 "  \"title\": \"Bad Form\",\n" +

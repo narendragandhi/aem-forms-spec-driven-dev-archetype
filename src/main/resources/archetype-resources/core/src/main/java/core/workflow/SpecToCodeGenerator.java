@@ -852,7 +852,7 @@ public class SpecToCodeGenerator {
 
         StringBuilder xml = new StringBuilder();
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        xml.append("<jcr:root xmlns:sling=\"http://sling.apache.org/jcr/sling/1.0\" xmlns:jcr=\"http://www.jcp.org/jcr/1.0\" xmlns:cq=\"http://www.day.com/jcr/cq/1.0\" xmlns:nt=\"http://www.jcp.org/jcr/nt/1.0\"\n");
+        xml.append("<jcr:root xmlns:sling=\"http://sling.apache.org/jcr/sling/1.0\" xmlns:jcr=\"http://www.jcp.org/jcr/1.0\" xmlns:cq=\"http://www.day.com/jcr/cq/1.0\" xmlns:nt=\"http://www.jcp.org/jcr/nt/1.0\" xmlns:fd=\"http://www.adobe.com/aemfd/fd/1.0\"\n");
         xml.append("    jcr:primaryType=\"cq:Page\">\n");
         xml.append("    <jcr:content\n");
         xml.append("        cq:template=\"/conf/").append(appName).append("/settings/wcm/templates/page-content\"\n");
@@ -864,7 +864,10 @@ public class SpecToCodeGenerator {
         xml.append("            jcr:primaryType=\"nt:unstructured\"\n");
         xml.append("            sling:resourceType=\"").append(appName).append("/components/adaptiveForm/formcontainer\"\n");
         xml.append("            editable=\"{Boolean}true\"\n");
-        xml.append("            guideNodeClass=\"guideContainerNode\">\n");
+        xml.append("            guideNodeClass=\"guideContainerNode\"\n");
+        xml.append("            actionType=\"fd/af/components/guidesubmittype/restendpoint\"\n");
+        xml.append("            thankYouOption=\"page\"\n");
+        xml.append("            thankYouMessage=\"Thank you for your submission.\">\n");
         xml.append("            <rootPanel\n");
         xml.append("                jcr:primaryType=\"nt:unstructured\"\n");
         xml.append("                sling:resourceType=\"").append(appName).append("/components/adaptiveForm/panel\"\n");
@@ -872,7 +875,9 @@ public class SpecToCodeGenerator {
         xml.append("                paneltype=\"simple\"\n");
         xml.append("                layout=\"wizard\">\n");
         xml.append("                <items jcr:primaryType=\"nt:unstructured\">\n");
-        for (SpecPanel panel : panels) {
+        for (int i = 0; i < panels.size(); i++) {
+            SpecPanel panel = panels.get(i);
+            boolean lastPanel = i == panels.size() - 1;
             String panelName = decapitalize(toComponentName(panel.title)) + "Panel";
             xml.append("                    <").append(panelName).append("\n");
             xml.append("                        jcr:primaryType=\"nt:unstructured\"\n");
@@ -883,6 +888,9 @@ public class SpecToCodeGenerator {
             xml.append("                        <items jcr:primaryType=\"nt:unstructured\">\n");
             for (SpecField f : panel.fields) {
                 appendFormField(xml, f, appName, "                            ");
+            }
+            if (lastPanel) {
+                appendSubmitButton(xml, appName, "                            ");
             }
             xml.append("                        </items>\n");
             xml.append("                    </").append(panelName).append(">\n");
@@ -896,6 +904,30 @@ public class SpecToCodeGenerator {
         Path pageFile = pageDir.resolve(".content.xml");
         Files.write(pageFile, xml.toString().getBytes(StandardCharsets.UTF_8));
         return pageFile;
+    }
+
+    // Real shape confirmed by two independent real sources: the shipped
+    // contact-us-form sample (a human-authored page using this same Core
+    // Components resourceType family) and actions/submit's own
+    // _cq_template.xml (the dialog template AEM Forms Editor itself uses).
+    // Omits the dialog template's <fd:rules> block on purpose - it's
+    // Rule-Editor bookkeeping keyed to an arbitrary per-instance button
+    // name/ID from whenever a human dragged the component in, not
+    // something meaningful to copy verbatim. <fd:events click="[submitForm()]"/>
+    // is the simpler piece both real sources share identically.
+    private void appendSubmitButton(StringBuilder xml, String appName, String indent) {
+        xml.append(indent).append("<submitButton\n");
+        xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/actions/submit\"\n");
+        xml.append(indent).append("    name=\"submitButton\"\n");
+        xml.append(indent).append("    jcr:title=\"Submit\"\n");
+        xml.append(indent).append("    fieldType=\"button\"\n");
+        xml.append(indent).append("    buttonType=\"submit\"\n");
+        xml.append(indent).append("    dorExclusion=\"true\">\n");
+        xml.append(indent).append("    <fd:events\n");
+        xml.append(indent).append("        jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append(indent).append("        click=\"[submitForm()]\"/>\n");
+        xml.append(indent).append("</submitButton>\n");
     }
 
     private void appendFormField(StringBuilder xml, SpecField f, String appName, String indent) throws IOException {
