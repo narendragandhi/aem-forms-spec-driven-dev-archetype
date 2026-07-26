@@ -13,7 +13,7 @@ code versus scaffolding you'd still need to build.
 | `SpecToCodeGenerator.generateForm()` | **Real, live-verified** | Generates a complete, submittable Adaptive Form (real JCR page/panel/field structure, standard field components, a working submit action) from a multi-panel spec. The most thoroughly proven capability in this archetype — deployed to a live instance and confirmed by actually POSTing a real submission and getting `HTTP 200`. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
-| `FormSubmissionService` | **Stub** | Logs and returns; the `// TODO: Replace with a real HTTP client call` in the source is accurate. Not currently referenced by `SignToDoRProcess`. |
+| `FormSubmissionService` | **Real, live-verified** | Real HTTP POST to a configurable external endpoint, wired into `HeadlessSubmitServlet`. Verified with a real listener (success) and real connection-refused failure — both paths, not just compile. |
 | Interactive Communications | **Real, not live-tested** | `InteractiveCommunicationServiceImpl` calls the real `PrintChannelRenderService` (verified via `javap`), Print Channel only. Its own OSGi component was `unsatisfied` (feature-toggle-gated) on the instance this was built against — check yours before relying on it. See [Interactive Communications (IC)](#interactive-communications-ic). |
 
 ## Why Use This Archetype?
@@ -377,7 +377,8 @@ customer data. Request/response shapes were verified via `javap` against
 the pinned SDK jar, not assumed from the package name.
 `InteractiveCommunicationServlet` (`GET /bin/bmad/interactive-communication?icPath=...&customerId=...`)
 gives it a real, reachable entry point rather than leaving it an orphaned
-service (the mistake `FormSubmissionService` made).
+service (the mistake `FormSubmissionService` used to make — since fixed,
+see [Implementation Status](#implementation-status)).
 
 ### A real, load-bearing finding: this API may not activate on your instance
 
@@ -561,11 +562,9 @@ project — each of these is a real gap, not a nice-to-have:
    enabled or fall back to `OutputService`, which is verified active.
    Web Channel rendering, letterhead, and prefill are still unbuilt even
    once Print Channel PDF generation itself is proven live.
-4. **Decide `FormSubmissionService`'s fate.** It's an orphaned TODO stub no
-   longer referenced by `SignToDoRProcess`. Either implement its real HTTP
-   call and re-wire something to use it, or delete it — a stub that looks
-   like working code is a liability, as this session's audit of
-   `InteractiveCommunicationServiceTest` demonstrated.
+4. ~~Decide `FormSubmissionService`'s fate.~~ Done — it's real now (a
+   genuine HTTP POST, wired into `HeadlessSubmitServlet`, live-verified
+   success and failure paths).
 5. **Close `generateForm()`'s remaining gaps.** It generates real,
    submittable forms now, but `visibleWhen`, repeatable scalar arrays, and
    validation constraints beyond `required` still fail fast rather than
