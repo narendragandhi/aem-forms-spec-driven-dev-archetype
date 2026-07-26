@@ -9,7 +9,8 @@ code versus scaffolding you'd still need to build.
 
 | Capability | Status | Notes |
 |---|---|---|
-| `SpecToCodeGenerator` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec. Verified via real compile/deploy. Scaffolds custom field *components*, not whole forms — you still assemble panels/layout/submission actions in AEM Forms Editor. |
+| `SpecToCodeGenerator.generate()` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec. Verified via real compile/deploy. Scaffolds a custom field *component* — generated React components are orphaned until manually wired into `App.jsx`'s `customMappings`. |
+| `SpecToCodeGenerator.generateForm()` | **Real, live-verified** | Generates a complete, submittable Adaptive Form (real JCR page/panel/field structure, standard field components, a working submit action) from a multi-panel spec. The most thoroughly proven capability in this archetype — deployed to a live instance and confirmed by actually POSTing a real submission and getting `HTTP 200`. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Stub** | Logs and returns; the `// TODO: Replace with a real HTTP client call` in the source is accurate. Not currently referenced by `SignToDoRProcess`. |
@@ -565,10 +566,14 @@ project — each of these is a real gap, not a nice-to-have:
    call and re-wire something to use it, or delete it — a stub that looks
    like working code is a liability, as this session's audit of
    `InteractiveCommunicationServiceTest` demonstrated.
-5. **Treat `SpecToCodeGenerator` as a component generator, not a form
-   generator.** Use it to cut boilerplate for custom field components; plan
-   on assembling actual form panels/layout/submission actions by hand in
-   AEM Forms Editor.
+5. **Close `generateForm()`'s remaining gaps.** It generates real,
+   submittable forms now, but `visibleWhen`, repeatable scalar arrays, and
+   validation constraints beyond `required` still fail fast rather than
+   generate — each needs its own ground-truth research pass (ideally
+   against a live, entitled instance, the way the submit action itself got
+   corrected from an earlier wrong conclusion). `generate()` (the
+   single-component path) still needs a real `App.jsx` auto-registration
+   mechanism before its output stops being orphaned by default.
 6. **Reconcile the `bmad/` guides with reality.** Several BEAD/guide docs
    (e.g. `interactive-communications-guide.md`) describe features as if
    they're implemented. Since these are meant to brief an AI assistant
@@ -590,8 +595,9 @@ Apache License 2.0
 
 ---
 
-**Built for the AI-assisted development era.** Solid scaffolding for custom
-components and workflow patterns. Adobe Sign and Interactive Communications
-are real integrations verified against Adobe's own APIs, neither yet
-proven on a live/fully-entitled instance; other external systems are still
-yours to build. See [Implementation Status](#implementation-status).
+**Built for the AI-assisted development era.** Complete Adaptive Form
+generation (`generateForm()`) is fully live-verified, submit action
+included. Adobe Sign and Interactive Communications are real integrations
+verified against Adobe's own APIs, neither yet proven on a live/fully-
+entitled instance; other external systems are still yours to build. See
+[Implementation Status](#implementation-status).
