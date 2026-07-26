@@ -783,9 +783,9 @@ class SpecToCodeGeneratorTest {
     }
 
     @Test
-    void testGenerateFormFailsFastOnVisibleWhen() throws IOException {
+    void testGenerateFormEmitsVisibilityRuleForVisibleWhen() throws IOException {
         String spec = "{\n" +
-                "  \"title\": \"Bad Form\",\n" +
+                "  \"title\": \"Conditional Form\",\n" +
                 "  \"panels\": [{\n" +
                 "    \"title\": \"Panel\",\n" +
                 "    \"properties\": {\n" +
@@ -794,12 +794,37 @@ class SpecToCodeGeneratorTest {
                 "    }\n" +
                 "  }]\n" +
                 "}\n";
-        Path specFile = writeSpec("bad-form-vw.json", spec);
+        Path specFile = writeSpec("conditional-form.json", spec);
 
-        IOException e = assertThrows(IOException.class,
-                () -> specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp"));
-        assertTrue(e.getMessage().contains("spouseName"));
-        assertTrue(e.getMessage().contains("visibleWhen"));
+        specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "conditional-form"));
+        assertTrue(xml.contains("<spouseName"));
+        assertTrue(xml.contains("<fd:rules"));
+        assertTrue(xml.contains("visible=\"maritalStatus == 'Married'\""),
+                "Expected a visibility rule referencing maritalStatus == 'Married', got: " + xml);
+        // maritalStatus itself has no visibleWhen, so it should be self-closing, not wrapped around an fd:rules child.
+        assertTrue(xml.contains("<maritalStatus\n") || xml.contains("<maritalStatus "));
+    }
+
+    @Test
+    void testGenerateFormEscapesSingleQuoteInVisibleWhenValue() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Conditional Form Quote\",\n" +
+                "  \"panels\": [{\n" +
+                "    \"title\": \"Panel\",\n" +
+                "    \"properties\": {\n" +
+                "      \"status\": { \"type\": \"string\", \"title\": \"Status\" },\n" +
+                "      \"detail\": { \"type\": \"string\", \"title\": \"Detail\", \"visibleWhen\": { \"field\": \"status\", \"equals\": \"It's Complicated\" } }\n" +
+                "    }\n" +
+                "  }]\n" +
+                "}\n";
+        Path specFile = writeSpec("conditional-form-quote.json", spec);
+
+        assertDoesNotThrow(() -> specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp"));
+        String xml = Files.readString(generatedFormXml("AcmeApp", "conditional-form-quote"));
+        assertTrue(xml.contains("visible=\"status == 'It\\'s Complicated'\""),
+                "Expected the embedded single quote to be escaped, got: " + xml);
     }
 
     @Test

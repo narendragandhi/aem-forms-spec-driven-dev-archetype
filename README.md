@@ -254,13 +254,28 @@ framework-native submit path is separate from, and not integrated with,
 this archetype's own hand-rolled `HeadlessSubmitServlet`/React headless
 submission flow.
 
+**`visibleWhen` conditional visibility, now supported.** A scalar field
+with `visibleWhen: {field, equals}` gets a child `<fd:rules visible="fieldName == 'Value'"/>`
+node — verified against the shipped `benefits-enrollment` showcase
+template's own human-authored conditional fields, which use this exact
+`fd:rules`/plain-`visible`-attribute shape (the larger `fd:visible` JSON
+blob alongside it there is Rule-Editor authoring bookkeeping, the same
+relationship already confirmed for the submit button's `fd:events` vs.
+`fd:rules`/`fd:click`). `field` must be a sibling within the same panel
+(bare-name resolution, matching the real example). **Honesty note,
+narrower than the submit action's proof**: live-deployed and confirmed
+the generated JCR content is byte-for-byte structurally identical to a
+real, working, human-authored example — but unlike the submit action
+(proven via an actual accepted `HTTP 200` submission), this environment
+has no browser to observe the client-side show/hide behavior actually
+executing. The content shape is verified real; the runtime behavior is
+inferred by exact analogy, not independently observed.
+
 **Deliberately scoped out this pass, rather than guessed at** — each of
 these has no verified-real JCR shape or property name found yet:
 - Repeatable **scalar** arrays (only repeatable *object* arrays are
   supported — the one real example is object-only). Fails fast with a
   clear error rather than emit a guessed structure.
-- `visibleWhen` conditional visibility (no verified Core Components
-  property for it).
 - Validation constraints beyond `required` (minLength/pattern/minimum/etc.
   — the real Core Components JCR property names for these weren't
   verified).
@@ -566,11 +581,12 @@ project — each of these is a real gap, not a nice-to-have:
    genuine HTTP POST, wired into `HeadlessSubmitServlet`, live-verified
    success and failure paths).
 5. **Close `generateForm()`'s remaining gaps.** It generates real,
-   submittable forms now, but `visibleWhen`, repeatable scalar arrays, and
-   validation constraints beyond `required` still fail fast rather than
-   generate — each needs its own ground-truth research pass (ideally
-   against a live, entitled instance, the way the submit action itself got
-   corrected from an earlier wrong conclusion). `generate()` (the
+   submittable forms with conditional visibility now, but repeatable
+   scalar arrays and validation constraints beyond `required` still fail
+   fast rather than generate — each needs its own ground-truth research
+   pass (ideally against a live, entitled instance, the way the submit
+   action and `visibleWhen` themselves got corrected from earlier wrong
+   conclusions). `generate()` (the
    single-component path) still needs a real `App.jsx` auto-registration
    mechanism before its output stops being orphaned by default.
 6. **Finish reconciling the `bmad/` guides with reality.** Partially done:

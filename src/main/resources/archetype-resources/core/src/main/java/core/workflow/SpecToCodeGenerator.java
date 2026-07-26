@@ -212,11 +212,6 @@ public class SpecToCodeGenerator {
                     + ") is a repeatable scalar array, which whole-form generation doesn't support yet "
                     + "(no verified real Adaptive Form JCR shape for it) - remove it or model it as a single field");
         }
-        if (f.visibleWhen != null) {
-            throw new IOException("Field '" + f.name + "' in panel '" + panelTitle + "' (" + specPath
-                    + ") uses visibleWhen, which whole-form generation doesn't support yet "
-                    + "(no verified real Adaptive Form conditional-visibility property) - remove it");
-        }
     }
 
     // --- spec parsing -------------------------------------------------------
@@ -930,6 +925,29 @@ public class SpecToCodeGenerator {
         xml.append(indent).append("</submitButton>\n");
     }
 
+    // Real shape confirmed against the shipped benefits-enrollment sample:
+    // an fd:rules node's plain `visible` attribute carries a simple,
+    // human-readable boolean expression ("fieldName == 'Value'") that's
+    // what the runtime actually evaluates - the much larger `fd:visible`
+    // JSON blob seen alongside it in that sample is Rule-Editor authoring
+    // bookkeeping (the visual rule's AST), the same relationship already
+    // confirmed for the submit button's fd:events vs fd:rules/fd:click.
+    // Scoped like the single-component generator's visibleWhen: a bare
+    // field-name reference resolves against a sibling within the same
+    // panel, not a cross-panel/top-level reference.
+    private void appendVisibilityRule(StringBuilder xml, VisibleWhen visibleWhen, String indent) {
+        String expression = visibleWhen.field + " == '" + expressionLiteralEscape(visibleWhen.equalsValue) + "'";
+        xml.append(indent).append("<fd:rules\n");
+        xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append(indent).append("    visible=\"").append(xmlEscape(expression)).append("\"/>\n");
+    }
+
+    // Guards against a spec-provided equalsValue breaking out of the
+    // single-quoted string literal in the generated rule expression.
+    private String expressionLiteralEscape(String s) {
+        return s.replace("'", "\\'");
+    }
+
     private void appendFormField(StringBuilder xml, SpecField f, String appName, String indent) throws IOException {
         switch (f.kind) {
             case SCALAR: {
@@ -944,7 +962,13 @@ public class SpecToCodeGenerator {
                 if (f.required) {
                     xml.append("\n").append(indent).append("    required=\"{Boolean}true\"");
                 }
-                xml.append("/>\n");
+                if (f.visibleWhen != null) {
+                    xml.append(">\n");
+                    appendVisibilityRule(xml, f.visibleWhen, indent + "    ");
+                    xml.append(indent).append("</").append(f.name).append(">\n");
+                } else {
+                    xml.append("/>\n");
+                }
                 break;
             }
             case OBJECT: {
