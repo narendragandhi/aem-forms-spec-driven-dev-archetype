@@ -11,6 +11,7 @@ import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
 import org.apache.sling.servlets.annotations.SlingServletPaths;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.propertytypes.ServiceDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,9 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
 
     private static final Logger LOG = LoggerFactory.getLogger(HeadlessSubmitServlet.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    @Reference
+    private transient FormSubmissionService formSubmissionService;
 
     @Override
     protected void doGet(final SlingHttpServletRequest req,
@@ -106,15 +110,17 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
         resp.setCharacterEncoding("UTF-8");
 
         ObjectNode result = MAPPER.createObjectNode();
-        if (submittedData.contains("error")) {
-            resp.setStatus(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            result.put("status", "error");
-            result.put("message", "Simulated processing error");
-        } else {
+        try {
+            formSubmissionService.processSubmission(submittedData, workflowId);
             resp.setStatus(SlingHttpServletResponse.SC_OK);
             result.put("status", "success");
             result.put("message", "Form submitted and Sign workflow initiated");
             result.put("workflowId", workflowId);
+        } catch (FormSubmissionException e) {
+            LOG.error("Failed to dispatch form submission for workflowId: {}", workflowId, e);
+            resp.setStatus(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("status", "error");
+            result.put("message", e.getMessage());
         }
         resp.getWriter().write(MAPPER.writeValueAsString(result));
     }

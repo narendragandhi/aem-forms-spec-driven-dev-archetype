@@ -7,21 +7,32 @@ import com.adobe.granite.workflow.metadata.MetaDataMap;
 import io.wcm.testing.mock.aem.junit5.AemContext;
 import io.wcm.testing.mock.aem.junit5.AemContextExtension;
 import org.apache.sling.api.resource.ResourceResolver;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import javax.servlet.ServletException;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(AemContextExtension.class)
 class HeadlessSubmitServletTest {
 
-    private final HeadlessSubmitServlet servlet = new HeadlessSubmitServlet();
+    private HeadlessSubmitServlet servlet;
+    private FormSubmissionService formSubmissionService;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        servlet = new HeadlessSubmitServlet();
+        formSubmissionService = mock(FormSubmissionService.class);
+        Field field = HeadlessSubmitServlet.class.getDeclaredField("formSubmissionService");
+        field.setAccessible(true);
+        field.set(servlet, formSubmissionService);
+    }
 
     // --- GET (status polling) ---
 
@@ -154,19 +165,33 @@ class HeadlessSubmitServletTest {
     }
 
     @Test
-    void testPostWithErrorBodyReturns500(AemContext context) throws ServletException, IOException {
-        context.request().setContent("{\"error\":true}".getBytes(StandardCharsets.UTF_8));
+    void testPostReturns500WhenFormSubmissionServiceThrows(AemContext context) throws Exception {
+        doThrow(new FormSubmissionException("submission API unreachable"))
+                .when(formSubmissionService).processSubmission(anyString(), anyString());
+        context.request().setContent("{\"name\":\"John\"}".getBytes(StandardCharsets.UTF_8));
         context.request().setContentType("application/json");
         servlet.doPost(context.request(), context.response());
         assertEquals(500, context.response().getStatus());
     }
 
     @Test
-    void testPostWithErrorBodyReturnsErrorStatus(AemContext context) throws ServletException, IOException {
-        context.request().setContent("{\"error\":true}".getBytes(StandardCharsets.UTF_8));
+    void testPostReturnsErrorStatusAndMessageWhenFormSubmissionServiceThrows(AemContext context) throws Exception {
+        doThrow(new FormSubmissionException("submission API unreachable"))
+                .when(formSubmissionService).processSubmission(anyString(), anyString());
+        context.request().setContent("{\"name\":\"John\"}".getBytes(StandardCharsets.UTF_8));
         context.request().setContentType("application/json");
         servlet.doPost(context.request(), context.response());
-        assertTrue(context.response().getOutputAsString().contains("\"status\":\"error\""));
+        String output = context.response().getOutputAsString();
+        assertTrue(output.contains("\"status\":\"error\""));
+        assertTrue(output.contains("submission API unreachable"));
+    }
+
+    @Test
+    void testPostCallsFormSubmissionServiceWithBodyAndWorkflowId(AemContext context) throws Exception {
+        context.request().setContent("{\"name\":\"John\"}".getBytes(StandardCharsets.UTF_8));
+        context.request().setContentType("application/json");
+        servlet.doPost(context.request(), context.response());
+        verify(formSubmissionService).processSubmission(eq("{\"name\":\"John\"}"), anyString());
     }
 
     @Test

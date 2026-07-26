@@ -3,6 +3,7 @@
   "excluded.urls": [
     "/libs/granite/csrf/token.json",
     "/system/sling/login",
-    "/bin/bmad/adobe-sign-webhook"
+    "/bin/bmad/adobe-sign-webhook",
+    "/bin/bmad/headless-submit"
   ]
 }

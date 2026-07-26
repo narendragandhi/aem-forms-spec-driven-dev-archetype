@@ -9,11 +9,21 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+
 /**
- * Service to handle post-processing of AEM Forms submissions.
+ * Dispatches a form submission to a configured external REST API - real
+ * HTTP call, same java.net.http.HttpClient pattern used by
+ * AdobeSignOrchestratorImpl/InteractiveCommunicationServiceImpl.
  *
- * This service can be invoked from a workflow process step after a user submits an Adaptive Form.
- * It demonstrates how to integrate with external systems via a REST API, with configurable endpoints.
+ * This service can be invoked from a workflow process step (or, as wired
+ * in this archetype, from HeadlessSubmitServlet) after a user submits an
+ * Adaptive Form.
  */
 @Component(service = FormSubmissionService.class)
 @Designate(ocd = FormSubmissionService.Config.class)
@@ -35,14 +45,16 @@ public class FormSubmissionService {
 
         @AttributeDefinition(
             name = "API Key/Token (Optional)",
-            description = "API key or token for authentication with the external service.",
-            type = AttributeType.STRING
+            description = "Bearer token for authentication with the external service.",
+            type = AttributeType.PASSWORD
         )
         String api_key() default "";
     }
 
     private String submissionApiEndpoint;
     private String apiKey;
+
+    HttpClient httpClient = HttpClient.newHttpClient(); // package-private so unit tests can substitute a mock
 
     @Activate
     protected void activate(final Config config) {
@@ -53,18 +65,37 @@ public class FormSubmissionService {
     }
 
     /**
-     * Processes the submitted form data by sending it to a configured external REST API.
+     * Processes the submitted form data by sending it to the configured
+     * external REST API.
      *
      * @param formDataJson The JSON data submitted from the Adaptive Form.
      * @param formIdentifier A unique identifier for the form that was submitted.
      */
-    public void processSubmission(String formDataJson, String formIdentifier) {
+    public void processSubmission(String formDataJson, String formIdentifier) throws FormSubmissionException {
         LOG.info("Processing submission for form: {}", formIdentifier);
         LOG.debug("Received form data: {}", formDataJson);
 
-        // TODO: Replace with a real HTTP client call (Apache HttpClient, OkHttp, or Java 11+ HttpClient).
-        // Send formDataJson as a POST to submissionApiEndpoint with Authorization: Bearer <apiKey>.
-        // Throw a RuntimeException (or a custom WorkflowException) if the remote call fails.
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+            .uri(URI.create(submissionApiEndpoint))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(formDataJson != null ? formDataJson : "{}", StandardCharsets.UTF_8));
+        if (apiKey != null && !apiKey.isEmpty()) {
+            requestBuilder.header("Authorization", "Bearer " + apiKey);
+        }
+
+        try {
+            HttpResponse<String> response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new FormSubmissionException("Submission API returned HTTP " + response.statusCode()
+                        + " for form " + formIdentifier + ": " + response.body());
+            }
+        } catch (IOException e) {
+            throw new FormSubmissionException("Failed to reach submission API for form " + formIdentifier
+                    + " at " + submissionApiEndpoint, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new FormSubmissionException("Interrupted while submitting form " + formIdentifier, e);
+        }
 
         LOG.info("Form data dispatched to external API for form: {}", formIdentifier);
     }
