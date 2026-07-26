@@ -1,5 +1,16 @@
 # Interactive Communications Guide
 
+> **Status check first**: the real, implemented service is
+> `InteractiveCommunicationServiceImpl.generatePrintPdf(icContentPath, customerId)`
+> — Print Channel only, a much narrower API than the `icService.generate()`/
+> `.generateAndSend()`/`.generateAndStore()`/`BatchService` examples further
+> down this guide, which are illustrative/aspirational and **will not
+> compile against this codebase**. See `README.md#interactive-communications-ic`
+> for what's real, including a load-bearing finding: the underlying
+> `PrintChannelRenderService` may not even activate on your instance
+> (it was feature-toggle-gated when this was verified). Read this guide as
+> a design sketch for the target architecture, not a working how-to.
+
 This guide covers how to use AEM Forms Interactive Communications (IC) with this archetype.
 
 ## Overview
@@ -118,6 +129,14 @@ The web channel generates responsive HTML:
 5. Preview across devices
 
 ## Integration Patterns
+
+> **Everything below this point is illustrative/aspirational** —
+> `ICOptions`, `Channel`, `BatchService`, `EmailOptions`, `StorageOptions`,
+> and the `icService.generate()`/`.generateAndSend()`/`.generateAndStore()`
+> method calls do not exist in this codebase. The real API is
+> `InteractiveCommunicationServiceImpl.generatePrintPdf(icContentPath, customerId)`,
+> called via `InteractiveCommunicationServlet`
+> (`GET /bin/bmad/interactive-communication?icPath=...&customerId=...`).
 
 ### With Adaptive Forms
 

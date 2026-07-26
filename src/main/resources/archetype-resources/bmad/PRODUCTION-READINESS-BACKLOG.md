@@ -1,5 +1,17 @@
 # Production Readiness Backlog
 
+> **Correction**: this document is internally inconsistent (the "100%
+> DONE" milestone below is immediately contradicted by its own backlog
+> showing 31% test coverage and 4 sprints of remaining work) and appears
+> to reference a different, related project — file paths and package
+> names below (`com.example.aem.bmad.core.services.impl`,
+> `ClaudeServiceImpl`, `OpenAIServiceImpl`, `EmailServiceImpl`) do not
+> exist anywhere in this archetype. Treat the task/sprint structure as a
+> generic template for planning a production-readiness backlog, not as an
+> accurate description of this codebase's actual state. See
+> `README.md#implementation-status` and `README.md#next-steps` for this
+> archetype's real, current gaps.
+
 ## MILESTONE COMPLETED: ELITE AEM FORMS (MARCH 2026)
 **Status:** 100% DONE
 **Achievements:**

@@ -573,12 +573,19 @@ project — each of these is a real gap, not a nice-to-have:
    corrected from an earlier wrong conclusion). `generate()` (the
    single-component path) still needs a real `App.jsx` auto-registration
    mechanism before its output stops being orphaned by default.
-6. **Reconcile the `bmad/` guides with reality.** Several BEAD/guide docs
-   (e.g. `interactive-communications-guide.md`) describe features as if
-   they're implemented. Since these are meant to brief an AI assistant
-   before it writes code, an aspirational doc read as fact will make the
-   next person's (or the next AI's) starting assumptions wrong in exactly
-   the way this session's audit found.
+6. **Finish reconciling the `bmad/` guides with reality.** Partially done:
+   `SUMMARY.md` was rewritten to match real status, and
+   `interactive-communications-guide.md`, `omnichannel-architecture.md`,
+   `enterprise-hardening-guide.md`, and `PRODUCTION-READINESS-BACKLOG.md`
+   (which turned out to reference a different project's file paths
+   entirely) got correction banners rather than full rewrites — there are
+   80+ docs under `bmad/` total, and only the ones directly referencing
+   features this session investigated were checked. A full audit of the
+   rest (tutorials, other `06-Integrations/` guides, `07-Operations/`)
+   hasn't happened. Since these are meant to brief an AI assistant before
+   it writes code, an aspirational doc read as fact will make the next
+   person's (or the next AI's) starting assumptions wrong in exactly the
+   way this session's audit found.
 
 ## Contributing
 

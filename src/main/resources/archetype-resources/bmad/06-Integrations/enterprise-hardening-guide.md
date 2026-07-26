@@ -1,5 +1,12 @@
 # Enterprise AEM Forms: Hardening & Modernization Guide
 
+> **Status: design vision, not implemented.** Nothing in this guide — the
+> Sensei-based Automated Forms Conversion Service, the "Migration Agent,"
+> Document Rights Management, FDM-as-middleware — exists as real code in
+> this archetype. Read it as a roadmap for enterprise scale-out, not
+> documentation of a working feature. See `README.md#implementation-status`
+> for what's actually real and verified.
+
 This guide outlines the "Elite" patterns for bridging modern Headless AEM Forms with industrial-strength enterprise document requirements. It incorporates strategies for mass migration, complex correspondence, and data orchestration.
 
 ## 1. Legacy Modernization: Automated Forms Conversion (AFCS)
