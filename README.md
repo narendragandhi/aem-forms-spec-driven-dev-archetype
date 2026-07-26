@@ -271,11 +271,27 @@ has no browser to observe the client-side show/hide behavior actually
 executing. The content shape is verified real; the runtime behavior is
 inferred by exact analogy, not independently observed.
 
-**Deliberately scoped out this pass, rather than guessed at** — each of
-these has no verified-real JCR shape or property name found yet:
-- Repeatable **scalar** arrays (only repeatable *object* arrays are
-  supported — the one real example is object-only). Fails fast with a
-  clear error rather than emit a guessed structure.
+**Repeatable scalar arrays, now supported — with an honest data-shape
+caveat.** A `type: array` field with scalar `items` (e.g. `skills: string[]`)
+now generates through the same real, verified `table`/`tablerow` structure
+already used for repeatable object arrays (the one real example found in
+this codebase, `financial-application`'s `employmentTable`, is
+object-only — no separate scalar-array-specific real JCR shape exists
+anywhere in the shipped content). Reusing it for a one-column case is
+structurally sound and live-verified (deployed and confirmed the exact
+generated `table`/`row1`/field nesting persists correctly in a real JCR
+tree), but it has a real consequence worth knowing: **the submitted data
+shape is an array of single-key row objects, not a flat array of
+primitives** — e.g. `skills: [{"value": "a"}, {"value": "b"}]`, not
+`skills: ["a", "b"]`. This follows directly from how `table`/`tablerow`
+binds data (each row is an object keyed by its fields' `name` attributes,
+already established by this generator's other fields), and it's the only
+verified-real repeatable mechanism available — not a bug, but a deliberate
+tradeoff. (The row's one field is named `value`, not the array's own
+name, specifically so it doesn't collide with — or get confused for — the
+enclosing table's own name.)
+
+**Deliberately scoped out this pass, rather than guessed at**:
 - Validation constraints beyond `required` (minLength/pattern/minimum/etc.
   — the real Core Components JCR property names for these weren't
   verified).
@@ -580,15 +596,16 @@ project — each of these is a real gap, not a nice-to-have:
 4. ~~Decide `FormSubmissionService`'s fate.~~ Done — it's real now (a
    genuine HTTP POST, wired into `HeadlessSubmitServlet`, live-verified
    success and failure paths).
-5. **Close `generateForm()`'s remaining gaps.** It generates real,
-   submittable forms with conditional visibility now, but repeatable
-   scalar arrays and validation constraints beyond `required` still fail
-   fast rather than generate — each needs its own ground-truth research
-   pass (ideally against a live, entitled instance, the way the submit
-   action and `visibleWhen` themselves got corrected from earlier wrong
-   conclusions). `generate()` (the
-   single-component path) still needs a real `App.jsx` auto-registration
-   mechanism before its output stops being orphaned by default.
+5. **Close `generateForm()`'s remaining gap: validation constraints beyond
+   `required`.** It generates real, submittable, conditionally-visible
+   forms with repeatable object *and* scalar arrays now — only
+   minLength/pattern/minimum/etc. still fail fast rather than generate,
+   needing its own ground-truth research pass (ideally against a live,
+   entitled instance, the way the submit action, `visibleWhen`, and
+   scalar arrays themselves got corrected/refined from earlier
+   conclusions). `generate()` (the single-component path) still needs a
+   real `App.jsx` auto-registration mechanism before its output stops
+   being orphaned by default.
 6. **Finish reconciling the `bmad/` guides with reality.** Partially done:
    `SUMMARY.md` was rewritten to match real status, and
    `interactive-communications-guide.md`, `omnichannel-architecture.md`,

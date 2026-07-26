@@ -764,22 +764,33 @@ class SpecToCodeGeneratorTest {
     }
 
     @Test
-    void testGenerateFormFailsFastOnRepeatableScalarArray() throws IOException {
+    void testGenerateFormEmitsRepeatableScalarArrayAsTable() throws IOException {
         String spec = "{\n" +
-                "  \"title\": \"Bad Form\",\n" +
+                "  \"title\": \"Tagged Form\",\n" +
                 "  \"panels\": [{\n" +
                 "    \"title\": \"Panel\",\n" +
                 "    \"properties\": {\n" +
                 "      \"tags\": { \"type\": \"array\", \"title\": \"Tags\", \"items\": { \"type\": \"string\" } }\n" +
-                "    }\n" +
+                "    },\n" +
+                "    \"required\": [\"tags\"]\n" +
                 "  }]\n" +
                 "}\n";
-        Path specFile = writeSpec("bad-form.json", spec);
+        Path specFile = writeSpec("tagged-form.json", spec);
 
-        IOException e = assertThrows(IOException.class,
-                () -> specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp"));
-        assertTrue(e.getMessage().contains("tags"));
-        assertTrue(e.getMessage().contains("repeatable scalar array"));
+        specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "tagged-form"));
+        assertTrue(xml.contains("<tags"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/table\""));
+        assertTrue(xml.contains("minOccur=\"{Long}1\""), "tags is required -> minOccur 1");
+        assertTrue(xml.contains("<row1"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/tablerow\""));
+        assertTrue(xml.contains("<value"));
+        assertTrue(xml.contains("name=\"value\""),
+                "the row-item field is named 'value', not 'tags' - it would otherwise collide with the enclosing "
+                        + "table's own name and produce per-row data keyed by the array's own name");
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/textinput\""),
+                "the synthesized single-item field for the scalar array should render as a normal scalar field");
     }
 
     @Test

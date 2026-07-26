@@ -157,7 +157,6 @@ public class SpecToCodeGenerator {
         if (panels.isEmpty()) {
             throw new IOException("Form spec has no 'panels' to generate from: " + specPath);
         }
-        validateForFormGeneration(panels, specPath);
 
         String slug = toKebabCase(toComponentName(title));
         Path out = Paths.get(outputPath);
@@ -182,36 +181,6 @@ public class SpecToCodeGenerator {
             panels.add(new SpecPanel(panelTitle, fields));
         }
         return panels;
-    }
-
-    // Fails fast on spec shapes this pass doesn't generate a verified-real
-    // JCR structure for, rather than guess: repeatable scalar arrays (no
-    // real example of that shape was found) and visibleWhen (no verified
-    // Core Components conditional-visibility property). rejectNestedContainers
-    // (already applied by readFields/readPanels) guarantees a nested
-    // OBJECT's own children are scalar-only, so checking one level into
-    // OBJECT/ARRAY_OBJECT children is sufficient - ARRAY_SCALAR/visibleWhen
-    // can't appear any deeper than that.
-    private void validateForFormGeneration(List<SpecPanel> panels, String specPath) throws IOException {
-        for (SpecPanel panel : panels) {
-            for (SpecField f : panel.fields) {
-                checkFieldSupportedForFormGeneration(f, panel.title, specPath);
-                List<SpecField> nested = f.kind == FieldKind.OBJECT || f.kind == FieldKind.ARRAY_OBJECT ? f.children : null;
-                if (nested != null) {
-                    for (SpecField child : nested) {
-                        checkFieldSupportedForFormGeneration(child, panel.title, specPath);
-                    }
-                }
-            }
-        }
-    }
-
-    private void checkFieldSupportedForFormGeneration(SpecField f, String panelTitle, String specPath) throws IOException {
-        if (f.kind == FieldKind.ARRAY_SCALAR) {
-            throw new IOException("Field '" + f.name + "' in panel '" + panelTitle + "' (" + specPath
-                    + ") is a repeatable scalar array, which whole-form generation doesn't support yet "
-                    + "(no verified real Adaptive Form JCR shape for it) - remove it or model it as a single field");
-        }
     }
 
     // --- spec parsing -------------------------------------------------------
@@ -329,7 +298,15 @@ public class SpecToCodeGenerator {
                             null, null, null, children, childModelName));
                 } else {
                     Constraints c = items != null ? readConstraints(items) : new Constraints();
-                    SpecField itemField = new SpecField(propName, itemTitle, "", false, FieldKind.SCALAR,
+                    // "value", not propName - this field is used as the AEM
+                    // Forms table/tablerow row-item's own node name
+                    // (generateForm) as well as a Java field name (generate).
+                    // Reusing propName there would give the row-item field
+                    // the same name as its enclosing array/table, which is
+                    // confusing and makes the per-row submitted data an
+                    // object keyed by the array's own name instead of
+                    // something meaningful.
+                    SpecField itemField = new SpecField("value", itemTitle, "", false, FieldKind.SCALAR,
                             javaType(itemJsonType), c, null, null, null);
                     fields.add(new SpecField(propName, fieldTitle, description, isRequired, FieldKind.ARRAY_SCALAR,
                             javaType(itemJsonType), c, null, List.of(itemField), null));
@@ -986,11 +963,18 @@ public class SpecToCodeGenerator {
                 xml.append(indent).append("</").append(f.name).append(">\n");
                 break;
             }
-            case ARRAY_OBJECT: {
+            case ARRAY_OBJECT:
+            case ARRAY_SCALAR: {
                 // Real repeatable pattern (verified against the shipped
                 // financial-application sample's employmentTable/row1): a
                 // table carrying min/maxOccur, with one authored tablerow
-                // as the repeating row template.
+                // as the repeating row template. ARRAY_SCALAR reuses this
+                // exact same proven structure rather than a separately
+                // guessed shape - readFields() already synthesizes a
+                // single-item SCALAR SpecField into f.children for
+                // ARRAY_SCALAR (the same shape ARRAY_OBJECT's own
+                // properties use), so a scalar array is just a table whose
+                // row template happens to have one field instead of several.
                 xml.append(indent).append('<').append(f.name).append('\n');
                 xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
                 xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/table\"\n");
@@ -1014,10 +998,6 @@ public class SpecToCodeGenerator {
                 xml.append(indent).append("</").append(f.name).append(">\n");
                 break;
             }
-            case ARRAY_SCALAR:
-                // Guarded against by validateForFormGeneration before this
-                // method is ever reached - defensive, not a real path.
-                throw new IOException("Repeatable scalar array field '" + f.name + "' reached appendFormField despite validation");
         }
     }
 
