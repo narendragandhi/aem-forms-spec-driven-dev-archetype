@@ -147,6 +147,89 @@ class SpecToCodeGeneratorTest {
         assertTrue(jsx.contains("export default function (props)"));
     }
 
+    // The real App.jsx (ui.frontend.react.forms.af/src/App.jsx) shipped by
+    // this archetype - seeded here since generate() patches an *existing*
+    // file rather than writing a brand new one, and tempDir is a bare
+    // directory, not a full generated project.
+    private static final String APP_JSX = "import React, { useEffect, useState } from 'react';\n" +
+            "import { AdaptiveForm } from '@aemforms/af-react-renderer';\n" +
+            "import { mappings } from '@aemforms/af-react-components';\n" +
+            "import CustomAddressField from './main/webpack/components/CustomAddressField';\n" +
+            "import './App.css';\n\n" +
+            "const customMappings = {\n" +
+            "  ...mappings,\n" +
+            "  'custom-address-field': CustomAddressField\n" +
+            "};\n";
+
+    private Path seedAppJsx() throws IOException {
+        Path appJsx = tempDir.resolve("ui.frontend.react.forms.af/src/App.jsx");
+        Files.createDirectories(appJsx.getParent());
+        Files.writeString(appJsx, APP_JSX);
+        return appJsx;
+    }
+
+    @Test
+    void testGenerateRegistersReactComponentInAppJsxCustomMappings() throws IOException {
+        Path appJsx = seedAppJsx();
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String app = Files.readString(appJsx);
+        assertTrue(app.contains(
+                "import SampleRegistrationForm from './main/webpack/components/generated/SampleRegistrationForm';"));
+        assertTrue(app.contains("'sample-registration-form': SampleRegistrationForm"));
+        // The existing hand-wired entry must survive untouched, with a comma
+        // now separating it from the newly inserted entry.
+        assertTrue(app.contains("'custom-address-field': CustomAddressField,"));
+        assertDoesNotThrow(() -> {
+            // Sanity check the object literal is still syntactically plausible:
+            // exactly one opening/closing brace pair for customMappings.
+            int open = app.indexOf("const customMappings = {");
+            int close = app.indexOf("\n};", open);
+            assertTrue(open >= 0 && close > open, "customMappings block should still be well-formed");
+        });
+    }
+
+    @Test
+    void testGenerateRegistersOneReactComponentPerArrayFieldToo() throws IOException {
+        seedAppJsx();
+        Path spec = writeSpec("benefits-enrollment.json", BENEFITS_ENROLLMENT_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String app = Files.readString(tempDir.resolve("ui.frontend.react.forms.af/src/App.jsx"));
+        assertTrue(app.contains("import PhoneNumbers from './main/webpack/components/generated/PhoneNumbers';"));
+        assertTrue(app.contains("'phone-numbers': PhoneNumbers"));
+        assertTrue(app.contains("import Dependent from './main/webpack/components/generated/Dependent';"));
+        assertTrue(app.contains("'dependent': Dependent"));
+    }
+
+    @Test
+    void testGenerateRegistrationIsIdempotentAcrossRepeatedRuns() throws IOException {
+        Path appJsx = seedAppJsx();
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
+
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+        specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp");
+
+        String app = Files.readString(appJsx);
+        assertEquals(1, app.split("import SampleRegistrationForm from", -1).length - 1,
+                "Re-running generate() for the same spec should not duplicate the import");
+        assertEquals(1, app.split("'sample-registration-form': SampleRegistrationForm", -1).length - 1,
+                "Re-running generate() for the same spec should not duplicate the mapping entry");
+    }
+
+    @Test
+    void testGenerateWithoutAppJsxPresentDoesNotFail() throws IOException {
+        // No App.jsx seeded this time - generate() must still succeed (it
+        // only patches App.jsx opportunistically when present).
+        Path spec = writeSpec("sample-form.json", SAMPLE_FORM_SPEC);
+
+        assertDoesNotThrow(() ->
+                specToCodeGenerator.generate(spec.toString(), tempDir.toString(), "com.acme", "AcmeApp"));
+    }
+
     @Test
     void testGenerateWithCardComponentSpecMatchesHandWrittenReference() throws IOException {
         // specs/card-component.json is the real spec this archetype ships, and

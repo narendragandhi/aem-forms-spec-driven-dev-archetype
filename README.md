@@ -9,7 +9,7 @@ code versus scaffolding you'd still need to build.
 
 | Capability | Status | Notes |
 |---|---|---|
-| `SpecToCodeGenerator.generate()` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec. Verified via real compile/deploy. Scaffolds a custom field *component* — generated React components are orphaned until manually wired into `App.jsx`'s `customMappings`. |
+| `SpecToCodeGenerator.generate()` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec, and now auto-registers every generated React component in `App.jsx`'s `customMappings` (import + mapping entry, idempotent across re-runs) — no more manual wiring. Verified via real compile/deploy. |
 | `SpecToCodeGenerator.generateForm()` | **Real, live-verified** | Generates a complete, submittable Adaptive Form (real JCR page/panel/field structure, standard field components, a working submit action) from a multi-panel spec. The most thoroughly proven capability in this archetype — deployed to a live instance and confirmed by actually POSTing a real submission and getting `HTTP 200`. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
@@ -175,10 +175,22 @@ new SpecToCodeGenerator().generate(
      component, not add/remove UI** — in real Adaptive Forms, repetition
      is a panel/form-model concern the renderer handles (see
      `@aemforms/af-react-renderer`'s `renderChildren`), not something a
-     field component's own code manages. To actually make one repeatable:
-     register the generated component in `App.jsx`'s `customMappings`
-     under its own field type, then configure the containing panel as
-     repeatable (`minItems`/`maxItems`) in AEM Forms Editor.
+     field component's own code manages. `generate()` automatically
+     registers every generated component (the main one and each array
+     field's item component) in `App.jsx`'s `customMappings` — the real
+     mechanism `@aemforms/af-react-renderer` uses to pick a React
+     component for a field, confirmed against the published package's own
+     source (`renderChildren.js`'s `getRenderer`, which looks a field up
+     by `:type` then falls back to `fieldType`). The registration is
+     idempotent (safe to re-run `generate()` for the same spec) and
+     patches the existing `App.jsx` in place via anchored text insertion,
+     not a JS/JSX parser — consistent with the rest of this generator's
+     approach, and it leaves any hand-added entries (like the shipped
+     `custom-address-field` example) untouched. To actually make a field
+     repeatable in the authored form: set that field's `fieldType` to the
+     generated component's slug (e.g. `phone-numbers`) in AEM Forms
+     Editor, then configure the containing panel as repeatable
+     (`minItems`/`maxItems`).
 
 3. **Build and deploy**:
 ```bash
@@ -200,10 +212,10 @@ custom component, it produces a **complete Adaptive Form** — a real
 `cq:Page`/`guideContainer`/panel/field JCR structure, using AEM Forms'
 *standard* field components (text/number/email/date/dropdown/checkbox),
 not custom Sling-Model-backed ones. That's a deliberate choice: standard
-fields need no custom React component or `App.jsx` registration (every
-component `generate()` produces today is orphaned until you manually wire
-it into `App.jsx`'s `customMappings` — see above), and it matches how a
-human author actually builds a form in AEM Forms Editor.
+fields need no custom React component or `App.jsx` registration at all
+(unlike `generate()`'s output, which now self-registers automatically —
+see above), and it matches how a human author actually builds a form in
+AEM Forms Editor.
 
 A whole-form spec uses a `"panels"` array instead of `generate()`'s single
 `"properties"` object — each panel's `properties`/`required` use the exact
@@ -612,9 +624,8 @@ project — each of these is a real gap, not a nice-to-have:
    scalar arrays and real validation constraints (minLength/maxLength/
    pattern/minimum/maximum) now, all against verified-real Core Components
    property names rather than guessed ones. `generate()` (the
-   single-component path) still needs a real `App.jsx` auto-registration
-   mechanism before its output stops being orphaned by default — that's
-   the one remaining gap in this area.
+   single-component path) also now auto-registers its React output in
+   `App.jsx` — see [Implementation Status](#implementation-status).
 6. **Finish reconciling the `bmad/` guides with reality.** Partially done:
    `SUMMARY.md` was rewritten to match real status, and
    `interactive-communications-guide.md`, `omnichannel-architecture.md`,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Field } from '@aem-forms/af-react-components';
+import { Field } from '@aemforms/af-react-components';
 
 /**
  * A concrete implementation for the 'firstName' field from the sample spec.

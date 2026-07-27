@@ -1,5 +1,5 @@
 import React from 'react';
-import { Field } from '@aem-forms/af-react-components';
+import { Field } from '@aemforms/af-react-components';
 
 const EmailField = ({ label, description, name, value, id, visible, enabled }) => {
   if (!visible) return null;

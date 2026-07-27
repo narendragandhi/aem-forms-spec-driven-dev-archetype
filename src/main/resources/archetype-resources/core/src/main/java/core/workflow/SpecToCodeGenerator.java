@@ -17,6 +17,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Turns a JSON Schema-style component spec (see specs/*.json for examples)
@@ -133,13 +135,13 @@ public class SpecToCodeGenerator {
      * "properties"}/{@code "required"} are parsed with the exact same logic
      * a single-component spec's fields already go through.
      *
-     * <p>Deliberately scoped: repeatable scalar-array fields and {@code
-     * visibleWhen} are not supported for whole-form generation (no verified
-     * real JCR shape for either was established for the Core Components
-     * format this generates against) and fail the whole generation with a
-     * clear error rather than emit a guessed structure. Constraint
-     * properties beyond {@code required} (minLength/pattern/minimum/etc.)
-     * and a submit action are not emitted this pass either — see README.
+     * <p>Generates a real submit action, {@code visibleWhen} conditional
+     * visibility, repeatable object and scalar arrays (both via the same
+     * verified {@code table}/{@code tablerow} structure), and validation
+     * constraints ({@code minLength}/{@code maxLength}/{@code pattern} on
+     * string fields, {@code minimum}/{@code maximum} on number fields) —
+     * see README for what's still deliberately out of scope and the
+     * verification each of these went through.
      *
      * @param specPath path to a whole-form spec file (title, panels[]: {title, properties, required})
      * @param outputPath root of the target project (contains ui.content/)
@@ -1115,6 +1117,7 @@ public class SpecToCodeGenerator {
         }
 
         written.add(writeReactFieldGroup(out, name, slug, specFileName, inlineFields));
+        registerReactComponentInApp(out, name, slug);
 
         for (SpecField arrayField : arrayFields) {
             String itemName = arrayField.kind == FieldKind.ARRAY_OBJECT
@@ -1126,9 +1129,61 @@ public class SpecToCodeGenerator {
             // item field built in readFields (ARRAY_SCALAR) — same shape
             // either way, so both render through the same field-group writer.
             written.add(writeReactFieldGroup(out, itemName, itemSlug, specFileName, arrayField.children));
+            registerReactComponentInApp(out, itemName, itemSlug);
         }
 
         return written;
+    }
+
+    private static final Pattern CUSTOM_MAPPINGS_BLOCK =
+            Pattern.compile("(const customMappings = \\{)([\\s\\S]*?)(\\n\\};)");
+
+    // App.jsx is a static, hand-authored file (not generated at runtime like
+    // everything else in this class) — its customMappings object is the real
+    // @aemforms/af-react-renderer mechanism (confirmed against the actual
+    // published package source, renderChildren.js's getRenderer: it looks up
+    // a field's renderer by `:type` then falls back to `fieldType`) for
+    // wiring a custom field's fieldType string to the React component that
+    // renders it, the same manual pattern CustomAddressField already
+    // demonstrates. Without this, a freshly generated React component is
+    // real but orphaned - nothing tells the renderer to use it unless a form
+    // author separately knows to hand-edit App.jsx. This patches the two
+    // spots (import list, customMappings object) via anchored text
+    // insertion rather than a JS/JSX parser, matching the pragmatic,
+    // non-AST-based approach already used for this generator's other
+    // outputs; it's idempotent, so regenerating the same spec twice doesn't
+    // duplicate entries.
+    private void registerReactComponentInApp(Path out, String name, String slug) throws IOException {
+        Path appJsx = out.resolve("ui.frontend.react.forms.af/src/App.jsx");
+        if (!Files.exists(appJsx)) {
+            return;
+        }
+        String content = Files.readString(appJsx, StandardCharsets.UTF_8);
+
+        String importLine = "import " + name + " from './main/webpack/components/generated/" + name + "';\n";
+        if (!content.contains(importLine)) {
+            String cssImport = "import './App.css';\n";
+            int idx = content.indexOf(cssImport);
+            if (idx >= 0) {
+                content = content.substring(0, idx) + importLine + content.substring(idx);
+            }
+        }
+
+        String mappingEntry = "'" + slug + "': " + name;
+        if (!content.contains(mappingEntry)) {
+            Matcher m = CUSTOM_MAPPINGS_BLOCK.matcher(content);
+            if (m.find()) {
+                String body = m.group(2);
+                String trimmedBody = body.replaceAll("\\s+$", "");
+                if (!trimmedBody.isEmpty() && !trimmedBody.endsWith(",")) {
+                    trimmedBody += ",";
+                }
+                String newBody = trimmedBody + "\n  " + mappingEntry;
+                content = content.substring(0, m.start(2)) + newBody + content.substring(m.end(2));
+            }
+        }
+
+        Files.write(appJsx, content.getBytes(StandardCharsets.UTF_8));
     }
 
     // Emits one component: a <fieldset> of inputs/selects for scalar fields,

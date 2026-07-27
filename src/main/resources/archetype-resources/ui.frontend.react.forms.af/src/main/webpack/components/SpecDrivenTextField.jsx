@@ -1,5 +1,5 @@
 import React from 'react';
-import { Field } from '@aem-forms/af-react-components';
+import { Field } from '@aemforms/af-react-components';
 
 /**
  * A generic, "spec-aware" text field component.
@@ -45,7 +45,7 @@ const SpecDrivenTextField = ({
 };
 
 export default function (props) {
-  // The 'Field' component from @aem-forms/af-react-components handles the
+  // The 'Field' component from @aemforms/af-react-components handles the
   // integration with the AEM Forms framework and data model.
   return <Field {...props} render={SpecDrivenTextField} />;
 }
