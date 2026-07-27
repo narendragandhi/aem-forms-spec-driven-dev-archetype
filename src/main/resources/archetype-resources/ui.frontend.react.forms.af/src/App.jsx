@@ -18,8 +18,13 @@ const App = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const formPath = params.get('formPath') || '/content/forms/af/${appName}/financial-application';
-    
+    const formPath = params.get('formPath');
+    if (!formPath) {
+      setError('Missing required "formPath" query parameter (e.g. ?formPath=/content/forms/af/<appName>/<slug>)');
+      setLoading(false);
+      return;
+    }
+
     fetch(`/bin/bmad/headless-form-service?formPath=${formPath}`)
       .then(response => {
         if (!response.ok) throw new Error('Network response was not ok');
@@ -55,10 +60,31 @@ const App = () => {
   }, [workflowId]);
 
   const onFormSubmit = (event) => {
-    const responseData = event.body;
-    if (responseData && responseData.workflowId) {
-      setWorkflowId(responseData.workflowId);
-    }
+    // event is the real @aemforms/af-core 'submitSuccess' action - its
+    // payload is the raw response from the framework's own native submit
+    // action (e.g. {redirectUrl: ...}), not custom data, and it has no
+    // .body property. The submitted form data itself comes from
+    // event.target.getState().data (a real getter backed by
+    // FormModel.exportData(), confirmed against the published
+    // @aemforms/af-core package source). Forward that to this
+    // archetype's own HeadlessSubmitServlet (backed by the real,
+    // live-verified FormSubmissionService) to kick off Sign/DoR
+    // post-processing - the framework's native submission already
+    // completed by the time this fires; this is a second, additive step.
+    const submittedData = event?.target?.getState ? event.target.getState().data : undefined;
+
+    fetch('/bin/bmad/headless-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submittedData || {})
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.workflowId) {
+          setWorkflowId(data.workflowId);
+        }
+      })
+      .catch(err => console.error('Failed to dispatch headless submission for post-processing:', err));
   };
 
   if (loading) return <div className="headless-form-container">Loading form...</div>;
@@ -66,7 +92,7 @@ const App = () => {
 
   return (
     <div className="headless-form-container">
-      <h1>Headless AEM Form - ${appName}</h1>
+      <h1>Headless AEM Form</h1>
       
       {workflowId ? (
         <div className="status-panel">

@@ -15,6 +15,7 @@ code versus scaffolding you'd still need to build.
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Real, live-verified** | Real HTTP POST to a configurable external endpoint, wired into `HeadlessSubmitServlet`. Verified with a real listener (success) and real connection-refused failure — both paths, not just compile. |
 | Interactive Communications | **Real, live-verified up to a native-SDK boundary** | `InteractiveCommunicationServiceImpl` calls the real `PrintChannelRenderService`, falling back to `com.adobe.fd.output.api.OutputService` when it's unavailable (as it was, entirely, on the instance this was built against — feature-toggle-gated). The fallback is live-tested end to end: component activation, an auth fix, and a `crx://` template-path fix were all confirmed against a real instance, up to AEM Forms' native XFA rendering SDK failing to start (same limitation `DoRService` has below) — a pre-existing environment issue, not a bug in this code. See [Interactive Communications (IC)](#interactive-communications-ic). |
+| Headless React flow (`App.jsx`) | **Real, test-verified — no browser proof** | Fetches a form's `.model.json` via `HeadlessFormService`, renders it with the real `AdaptiveForm` component, and now actually forwards the submitted data to `HeadlessSubmitServlet` after a successful native submission (it never did before — a real, previously-undetected bug, found and fixed this session, see below). See [Headless React Flow](#headless-react-flow). |
 
 ## Why Use This Archetype?
 
@@ -325,6 +326,56 @@ working content.
   Core Components' documented identifiers, not independently verified
   against a live instance in this pass (unlike `text-input`/`number-input`,
   which are directly confirmed from the shipped sample).
+
+## Headless React Flow
+
+`ui.frontend.react.forms.af/src/App.jsx` is a real headless consumer for
+Adaptive Forms — including ones `generateForm()` produces. The flow:
+`?formPath=` query param → `HeadlessFormService`
+(`/bin/bmad/headless-form-service`, real servlet, returns the form's real
+`.model.json` endpoint) → fetch that `.model.json` → render it with the
+real `AdaptiveForm` component from `@aemforms/af-react-renderer`.
+
+**Two real bugs found and fixed this session** (both were previously
+undetected because `it.tests.skipFrontend=true` by default in this
+archetype's own IT — the frontend build/tests have never actually run as
+part of `mvn clean install`, only when invoked directly):
+
+- **A crash on every render.** `<h1>Headless AEM Form - ${appName}</h1>`
+  isn't a template literal — inside JSX text, `${appName}` is parsed as
+  literal text plus an embedded JSX expression `{appName}`, and
+  `appName` isn't a variable anywhere in this component. Every mount
+  threw `ReferenceError: appName is not defined`. Fixed by removing the
+  broken interpolation; the same pattern in the default `formPath`
+  fallback was also removed in favor of a clear error when the query
+  param is missing, rather than a silently-wrong guessed path (this
+  module isn't Velocity-filtered by the archetype, confirmed by
+  generating a project and observing `${appName}` survive as literal
+  text — unlike most of this archetype's other files, `${...}` here is
+  never substituted).
+- **Submissions were never actually forwarded.** `onSubmitSuccess`'s
+  event handler read `event.body.workflowId` — but the real
+  `@aemforms/af-core` `submitSuccess` event has no `.body` at all (its
+  `.payload` is the framework's own native-submit response, e.g.
+  `{redirectUrl: ...}`), so `HeadlessSubmitServlet` (backed by the real,
+  live-verified `FormSubmissionService`) was never actually called by
+  the UI despite `HeadlessFormService` advertising a `submitUrl` for it.
+  Fixed: the submitted data now comes from the real
+  `event.target.getState().data` getter (confirmed against the
+  published `@aemforms/af-core` source), POSTed to
+  `/bin/bmad/headless-submit` after the framework's own native
+  submission succeeds — an additive second step, not a replacement for
+  the native submit action already proven in
+  [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form).
+
+**Honesty note**: verified via a real Vitest test suite (`App.test.jsx`,
+mocking `AdaptiveForm` and driving it with the real `submitSuccess` event
+shape) — this environment has no browser, so no one has actually opened
+this app and watched a `generateForm()`-generated form render and submit
+through the real UI. Run `npm test` (or `npm start` and open a browser)
+in `ui.frontend.react.forms.af` yourself before trusting this beyond what
+the test suite covers. Consider setting `it.tests.skipFrontend=false` for
+your own project so regressions like these don't go undetected again.
 
 ## Document of Record (DoR) Generation
 
