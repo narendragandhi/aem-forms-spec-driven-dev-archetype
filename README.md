@@ -291,10 +291,21 @@ tradeoff. (The row's one field is named `value`, not the array's own
 name, specifically so it doesn't collide with — or get confused for — the
 enclosing table's own name.)
 
+**Validation constraints, now supported.** `minLength`/`maxLength`/`pattern`
+on string fields and `minimum`/`maximum` on number fields generate as real
+attributes on the field node — property names confirmed against AEM Core
+Forms Components' own source (`github.com/adobe/aem-core-forms-components`,
+`textinput`/`emailinput`/`numberinput`'s `_cq_dialog` definitions), not
+guessed. Two things worth knowing: `minLength`/`maxLength` only apply to
+`textinput` — `emailinput`'s real dialog exposes `pattern` but not
+length constraints, and this generator matches that (a `minLength` on an
+`email`-format field is silently dropped rather than emitted somewhere
+it wouldn't be recognized). And `pattern` is directly corroborated live,
+independent of the dialog research — the shipped `contact-us-form`
+sample's `telephoneinput` field carries `pattern="^[0-9]{10}$"` as real,
+working content.
+
 **Deliberately scoped out this pass, rather than guessed at**:
-- Validation constraints beyond `required` (minLength/pattern/minimum/etc.
-  — the real Core Components JCR property names for these weren't
-  verified).
 - `dropdown`'s `date-input`/`drop-down` field type strings are AEM Forms
   Core Components' documented identifiers, not independently verified
   against a live instance in this pass (unlike `text-input`/`number-input`,
@@ -596,16 +607,14 @@ project — each of these is a real gap, not a nice-to-have:
 4. ~~Decide `FormSubmissionService`'s fate.~~ Done — it's real now (a
    genuine HTTP POST, wired into `HeadlessSubmitServlet`, live-verified
    success and failure paths).
-5. **Close `generateForm()`'s remaining gap: validation constraints beyond
-   `required`.** It generates real, submittable, conditionally-visible
-   forms with repeatable object *and* scalar arrays now — only
-   minLength/pattern/minimum/etc. still fail fast rather than generate,
-   needing its own ground-truth research pass (ideally against a live,
-   entitled instance, the way the submit action, `visibleWhen`, and
-   scalar arrays themselves got corrected/refined from earlier
-   conclusions). `generate()` (the single-component path) still needs a
-   real `App.jsx` auto-registration mechanism before its output stops
-   being orphaned by default.
+5. ~~Close `generateForm()`'s remaining gaps.~~ Done — it generates real,
+   submittable, conditionally-visible forms with repeatable object *and*
+   scalar arrays and real validation constraints (minLength/maxLength/
+   pattern/minimum/maximum) now, all against verified-real Core Components
+   property names rather than guessed ones. `generate()` (the
+   single-component path) still needs a real `App.jsx` auto-registration
+   mechanism before its output stops being orphaned by default — that's
+   the one remaining gap in this area.
 6. **Finish reconciling the `bmad/` guides with reality.** Partially done:
    `SUMMARY.md` was rewritten to match real status, and
    `interactive-communications-guide.md`, `omnichannel-architecture.md`,

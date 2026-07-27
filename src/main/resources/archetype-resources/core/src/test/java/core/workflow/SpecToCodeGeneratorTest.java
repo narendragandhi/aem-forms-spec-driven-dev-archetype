@@ -839,6 +839,70 @@ class SpecToCodeGeneratorTest {
     }
 
     @Test
+    void testGenerateFormEmitsTextinputValidationConstraints() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Validated Form\",\n" +
+                "  \"panels\": [{\n" +
+                "    \"title\": \"Panel\",\n" +
+                "    \"properties\": {\n" +
+                "      \"username\": { \"type\": \"string\", \"title\": \"Username\", \"minLength\": 3, \"maxLength\": 20, \"pattern\": \"^[a-z0-9]+$\" }\n" +
+                "    }\n" +
+                "  }]\n" +
+                "}\n";
+        Path specFile = writeSpec("validated-form.json", spec);
+
+        specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "validated-form"));
+        assertTrue(xml.contains("minLength=\"3\""));
+        assertTrue(xml.contains("maxLength=\"20\""));
+        assertTrue(xml.contains("pattern=\"^[a-z0-9]+$\""));
+    }
+
+    @Test
+    void testGenerateFormEmitsNumberinputMinMaxConstraints() throws IOException {
+        String spec = "{\n" +
+                "  \"title\": \"Age Form\",\n" +
+                "  \"panels\": [{\n" +
+                "    \"title\": \"Panel\",\n" +
+                "    \"properties\": {\n" +
+                "      \"age\": { \"type\": \"integer\", \"title\": \"Age\", \"minimum\": 18, \"maximum\": 120 }\n" +
+                "    }\n" +
+                "  }]\n" +
+                "}\n";
+        Path specFile = writeSpec("age-form.json", spec);
+
+        specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "age-form"));
+        assertTrue(xml.contains("minimum=\"18\""), "whole-number minimum should print without a trailing .0, got: " + xml);
+        assertTrue(xml.contains("maximum=\"120\""), "whole-number maximum should print without a trailing .0, got: " + xml);
+    }
+
+    @Test
+    void testGenerateFormOmitsLengthConstraintsOnEmailinputButKeepsPattern() throws IOException {
+        // emailinput's real _cq_dialog (AEM Core Forms Components) only
+        // exposes a pattern property, not minLength/maxLength - unlike
+        // textinput's dialog, which has both.
+        String spec = "{\n" +
+                "  \"title\": \"Email Form\",\n" +
+                "  \"panels\": [{\n" +
+                "    \"title\": \"Panel\",\n" +
+                "    \"properties\": {\n" +
+                "      \"email\": { \"type\": \"string\", \"title\": \"Email\", \"format\": \"email\", \"minLength\": 5, \"pattern\": \".+@.+\" }\n" +
+                "    }\n" +
+                "  }]\n" +
+                "}\n";
+        Path specFile = writeSpec("email-form.json", spec);
+
+        specToCodeGenerator.generateForm(specFile.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "email-form"));
+        assertTrue(xml.contains("pattern=\".+@.+\""));
+        assertFalse(xml.contains("minLength="), "emailinput's real dialog has no minLength property, unlike textinput's");
+    }
+
+    @Test
     void testGenerateFormThrowsWhenNoPanels() throws IOException {
         Path specFile = writeSpec("no-panels.json", "{\"title\": \"Empty\"}\n");
 

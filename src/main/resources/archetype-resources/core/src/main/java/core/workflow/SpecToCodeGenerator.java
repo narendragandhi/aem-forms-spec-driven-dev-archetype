@@ -925,6 +925,48 @@ public class SpecToCodeGenerator {
         return s.replace("'", "\\'");
     }
 
+    // Real property names confirmed against AEM Core Forms Components' own
+    // _cq_dialog definitions (github.com/adobe/aem-core-forms-components,
+    // textinput/v1, emailinput/v1, numberinput/v1) - minLength/maxLength
+    // only exist on textinput's dialog (not emailinput's, which exposes
+    // only pattern), minimum/maximum only on numberinput's. None of the
+    // dialogs put a @TypeHint on these numberfield-widget properties, so
+    // they're authored as plain unprefixed numeric strings - matching the
+    // shipped purchase-request sample's real minimum="1" content, not a
+    // {Long}/{Double} type hint. pattern on textinput is also directly
+    // confirmed live (contact-us-form's telephoneinput: pattern="^[0-9]{10}$").
+    private void appendValidationConstraints(StringBuilder xml, String resourceType, Constraints c, String indent) {
+        if (("textinput".equals(resourceType) || "emailinput".equals(resourceType)) && c.pattern != null) {
+            xml.append("\n").append(indent).append("    pattern=\"").append(xmlEscape(c.pattern)).append('"');
+        }
+        if ("textinput".equals(resourceType)) {
+            if (c.minLength != null) {
+                xml.append("\n").append(indent).append("    minLength=\"").append(c.minLength).append('"');
+            }
+            if (c.maxLength != null) {
+                xml.append("\n").append(indent).append("    maxLength=\"").append(c.maxLength).append('"');
+            }
+        }
+        if ("numberinput".equals(resourceType)) {
+            if (c.minimum != null) {
+                xml.append("\n").append(indent).append("    minimum=\"").append(formatConstraintNumber(c.minimum)).append('"');
+            }
+            if (c.maximum != null) {
+                xml.append("\n").append(indent).append("    maximum=\"").append(formatConstraintNumber(c.maximum)).append('"');
+            }
+        }
+    }
+
+    // minimum/maximum are parsed as Double (readConstraints) even for
+    // whole-number specs like "minimum": 1 - printed as "1", not "1.0",
+    // to match the shipped purchase-request sample's real content.
+    private String formatConstraintNumber(double d) {
+        if (d == Math.rint(d) && !Double.isInfinite(d)) {
+            return Long.toString((long) d);
+        }
+        return Double.toString(d);
+    }
+
     private void appendFormField(StringBuilder xml, SpecField f, String appName, String indent) throws IOException {
         switch (f.kind) {
             case SCALAR: {
@@ -939,6 +981,7 @@ public class SpecToCodeGenerator {
                 if (f.required) {
                     xml.append("\n").append(indent).append("    required=\"{Boolean}true\"");
                 }
+                appendValidationConstraints(xml, resourceType, f.constraints, indent);
                 if (f.visibleWhen != null) {
                     xml.append(">\n");
                     appendVisibilityRule(xml, f.visibleWhen, indent + "    ");
