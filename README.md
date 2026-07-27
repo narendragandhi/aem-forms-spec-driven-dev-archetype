@@ -14,7 +14,7 @@ code versus scaffolding you'd still need to build.
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Real, live-verified** | Real HTTP POST to a configurable external endpoint, wired into `HeadlessSubmitServlet`. Verified with a real listener (success) and real connection-refused failure — both paths, not just compile. |
-| Interactive Communications | **Real, not live-tested** | `InteractiveCommunicationServiceImpl` calls the real `PrintChannelRenderService` (verified via `javap`), Print Channel only. Its own OSGi component was `unsatisfied` (feature-toggle-gated) on the instance this was built against — check yours before relying on it. See [Interactive Communications (IC)](#interactive-communications-ic). |
+| Interactive Communications | **Real, live-verified up to a native-SDK boundary** | `InteractiveCommunicationServiceImpl` calls the real `PrintChannelRenderService`, falling back to `com.adobe.fd.output.api.OutputService` when it's unavailable (as it was, entirely, on the instance this was built against — feature-toggle-gated). The fallback is live-tested end to end: component activation, an auth fix, and a `crx://` template-path fix were all confirmed against a real instance, up to AEM Forms' native XFA rendering SDK failing to start (same limitation `DoRService` has below) — a pre-existing environment issue, not a bug in this code. See [Interactive Communications (IC)](#interactive-communications-ic). |
 
 ## Why Use This Archetype?
 
@@ -436,25 +436,75 @@ see [Implementation Status](#implementation-status)).
 
 ### A real, load-bearing finding: this API may not activate on your instance
 
-On the instance this was built against, `PrintChannelRenderServiceImpl`'s
-own OSGi component is in state **`unsatisfied (reference)`** — one of
-*its* dependencies is a `ToggleCondition` gated on `toggle.name=FT_FORMS-14262`,
-which isn't even registered in that instance's toggle console (not
-disabled — not provisioned at all). Check yours before relying on this:
+On the instance this was built against, **every component** in
+`PrintChannelRenderServiceImpl`'s own bundle
+(`com.adobe.aem.forms.ic.print-render-impl`) is `unsatisfied (reference)` —
+not just the top-level service, but all five: `PrintChannelRenderServiceImpl`,
+`PrintChannelRenderServiceInternalImpl`, `XFADocumentBuilderImpl`,
+`RenderPdfProcessor`, `RenderPrintProcessor`. Tracing the unsatisfied
+references down confirms a single root cause, not five independent ones:
+every one of them carries the same `toggleCondition.target = (toggle.name=FT_FORMS-14262)`
+gate, and that toggle isn't registered in the instance's toggle console at
+all — not disabled, not provisioned. Check yours:
 
 ```
 curl -u admin:admin http://localhost:4502/system/console/components.json \
   | grep -A2 PrintChannelRenderServiceImpl
 ```
 
-If it says anything other than `"state": "active"`,
-`InteractiveCommunicationServiceImpl` won't activate either —
-`printChannelRenderService` is a mandatory `@Reference`, so this fails
-loudly (the component simply won't come up) rather than silently doing
-nothing. A more general service, `com.adobe.fd.output.api.OutputService`,
-is verified **active** on the same instance and could achieve a similar
-template+data→PDF outcome without this gate, if you hit the same wall and
-want a fallback.
+If it says anything other than `"state": "active"`, this whole bundle is
+gated on your instance too.
+
+**Fixed, not just documented.** `InteractiveCommunicationServiceImpl` now
+treats `printChannelRenderService` as an *optional* `@Reference` and adds
+`com.adobe.fd.output.api.OutputService` (verified **active** on the same
+instance) as a mandatory one. `generatePrintPdf()` uses
+`PrintChannelRenderService` when it's bound, and falls back to
+`OutputService.generatePDFOutput(...)` when it isn't — so this component
+now actually **activates** on an instance where the toggle-gated bundle
+doesn't, instead of failing to come up at all (confirmed live: the
+component's own state went from `unsatisfied (reference)` to `active`
+after this change, on the exact same instance).
+
+Two real differences the fallback has to account for, both confirmed by
+research and/or live testing, not assumed:
+- `OutputService.generatePDFOutput` expects **XML** data (Adobe's own
+  Output Service docs: "an XML document that is merged with the
+  template"), unlike `PrintChannelRenderService`'s JSON-native contract —
+  the fallback converts the fetched customer JSON to a generic XML
+  structure for this reason. That conversion is real and tested, but is a
+  generic structural mapping, not tailored to any specific XDP template's
+  own data schema.
+- The template path needs a **`crx://` scheme prefix**
+  (`crx:///content/dam/formsanddocuments/...xdp`) — confirmed live: a bare
+  repository path fails with `AEM_OUT_001_020: Invalid template` (the
+  underlying `FileResource` lookup reports "No File Found" for it).
+  Matches the example paths in Adobe's own Output Service documentation.
+
+**Live-tested end to end, up to a real environment boundary.** Deployed
+this to a live instance, configured real credentials (see below), and hit
+the actual servlet endpoint against a real XDP asset. The fallback's own
+code — activation, the customer-data fetch, the `crx://` path fix — is
+proven correct: the call successfully reaches AEM Forms' native XFA
+rendering SDK, which then throws
+`IllegalStateException: Error getting shared temp directory, check
+whether the SDK started successfully.` on this instance. That's the exact
+same native-SDK-not-started limitation already documented below for
+`DoRService` — a pre-existing, environment-level issue outside this
+archetype's code, not a bug introduced by the fallback. If your instance's
+native XFA SDK actually starts, this fallback should render a real PDF;
+this session's instance couldn't get far enough to observe that last step.
+
+**A second real gap this live-testing surfaced**: this instance returns
+`401` for anonymous requests to `/bin/*` servlets, including the
+archetype's own `MockFinanceDataServlet` — meaning the customer-data fetch
+(and therefore *all* of `generatePrintPdf()`, both the PrintChannel path
+and the new fallback) was never actually completable end-to-end here
+without credentials. `InteractiveCommunicationServiceImpl.Config` now has
+optional `customer_data_username`/`customer_data_password` (HTTP Basic
+Auth) for exactly this — empty by default (no behavior change unless you
+set them), matching `FormSubmissionService`'s existing `PASSWORD`-typed
+config pattern.
 
 ### Data source
 
@@ -484,12 +534,16 @@ than inventing a new one.
   Adaptive Form) is one of the things only a live, toggle-enabled instance
   can confirm.
 
-**Honesty note**, same bar as Adobe Sign: verified via `javap` against the
-real SDK and mocked in tests (including a real gotcha caught along the
-way — `com.adobe.aemfd.docmanager.Document`'s constructors delegate to a
-static `DocumentFactory` singleton that's `null` outside a live AEM
-runtime, so tests install a minimal in-memory one rather than skip the
-issue). Not run against a live, toggle-enabled AEM Forms instance.
+**Honesty note**: the `PrintChannelRenderService` path itself is verified
+via `javap` against the real SDK and mocked in tests (including a real
+gotcha caught along the way — `com.adobe.aemfd.docmanager.Document`'s
+constructors delegate to a static `DocumentFactory` singleton that's
+`null` outside a live AEM runtime, so tests install a minimal in-memory
+one rather than skip the issue) — same bar as Adobe Sign, not run against
+a live, toggle-enabled instance. The `OutputService` fallback goes
+further: live-tested against a real instance and real XDP asset, with two
+real bugs caught and fixed in the process (the `crx://` path prefix and
+the anonymous-401 auth gap) rather than shipped untested — see above.
 
 `bmad/06-Integrations/interactive-communications-guide.md` describes the
 broader intended architecture (Web Channel, FDM data sourcing beyond the
@@ -608,14 +662,15 @@ project — each of these is a real gap, not a nice-to-have:
    dance) and run a real signature round-trip before trusting this in
    anything beyond a demo — mocked-against-docs and proven-against-a-real-
    account are different bars.
-3. **Check whether `PrintChannelRenderServiceImpl` is actually active on
-   your instance** (see [Interactive Communications](#interactive-communications-ic)
-   for the exact check) before relying on `InteractiveCommunicationServiceImpl`
-   — it was feature-toggle-gated and unsatisfied on the instance this was
-   built against. If it's gated on yours too, either get the toggle
-   enabled or fall back to `OutputService`, which is verified active.
-   Web Channel rendering, letterhead, and prefill are still unbuilt even
-   once Print Channel PDF generation itself is proven live.
+3. ~~Resolve the `PrintChannelRenderServiceImpl` toggle gap.~~ Done —
+   `InteractiveCommunicationServiceImpl` now falls back to `OutputService`
+   automatically when `PrintChannelRenderService` isn't bound, live-tested
+   end to end up to a native-XFA-SDK environment boundary (see
+   [Interactive Communications](#interactive-communications-ic)). Confirm
+   your own instance's native XFA SDK actually starts (same `error.log`
+   check as DoR, item 1 above) before expecting a real rendered PDF out of
+   either path. Web Channel rendering, letterhead, and prefill are still
+   unbuilt regardless of which render path activates.
 4. ~~Decide `FormSubmissionService`'s fate.~~ Done — it's real now (a
    genuine HTTP POST, wired into `HeadlessSubmitServlet`, live-verified
    success and failure paths).

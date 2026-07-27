@@ -6,6 +6,9 @@ import com.adobe.aem.forms.ic.print.api.PrintChannelRenderService;
 import com.adobe.aem.forms.ic.print.model.IcPdfRenderOptions;
 import com.adobe.aemfd.docmanager.Document;
 import com.adobe.aemfd.docmanager.DocumentFactory;
+import com.adobe.fd.output.api.OutputService;
+import com.adobe.fd.output.api.OutputServiceException;
+import com.adobe.fd.output.api.PDFOutputOptions;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +58,9 @@ class InteractiveCommunicationServiceImplTest {
 
     @Mock
     private PrintChannelRenderService printChannelRenderService;
+
+    @Mock
+    private OutputService outputService;
 
     @Mock
     private HttpClient httpClient;
@@ -137,8 +143,11 @@ class InteractiveCommunicationServiceImplTest {
     void setUp() throws Exception {
         service = new InteractiveCommunicationServiceImpl();
         setField("printChannelRenderService", printChannelRenderService);
+        setField("outputService", outputService);
         setField("customerDataEndpoint", ENDPOINT);
         setField("locale", "en");
+        setField("customerDataUsername", "");
+        setField("customerDataPassword", "");
         service.httpClient = httpClient;
     }
 
@@ -208,6 +217,36 @@ class InteractiveCommunicationServiceImplTest {
     }
 
     @Test
+    void testGeneratePrintPdfOmitsAuthorizationHeaderByDefault() throws Exception {
+        when(httpClient.send(any(HttpRequest.class), any())).thenAnswer(invocation -> mockHttpResponse(200, "{}".getBytes(StandardCharsets.UTF_8)));
+        when(printChannelRenderService.renderPdf(anyString(), any(Document.class), isNull(), any(IcPdfRenderOptions.class)))
+            .thenReturn(new InMemoryDocument("bytes".getBytes(StandardCharsets.UTF_8)));
+
+        service.generatePrintPdf("/content/dam/formsanddocuments/ic/AcmeApp/account-statement", "CUST-43");
+
+        org.mockito.ArgumentCaptor<HttpRequest> captor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(captor.capture(), any());
+        assertTrue(captor.getValue().headers().firstValue("Authorization").isEmpty(),
+            "No username configured (the archetype default) -> no Authorization header sent");
+    }
+
+    @Test
+    void testGeneratePrintPdfSendsBasicAuthWhenCredentialsConfigured() throws Exception {
+        setField("customerDataUsername", "admin");
+        setField("customerDataPassword", "admin");
+        when(httpClient.send(any(HttpRequest.class), any())).thenAnswer(invocation -> mockHttpResponse(200, "{}".getBytes(StandardCharsets.UTF_8)));
+        when(printChannelRenderService.renderPdf(anyString(), any(Document.class), isNull(), any(IcPdfRenderOptions.class)))
+            .thenReturn(new InMemoryDocument("bytes".getBytes(StandardCharsets.UTF_8)));
+
+        service.generatePrintPdf("/content/dam/formsanddocuments/ic/AcmeApp/account-statement", "CUST-44");
+
+        org.mockito.ArgumentCaptor<HttpRequest> captor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(captor.capture(), any());
+        String expected = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:admin".getBytes(StandardCharsets.UTF_8));
+        assertEquals(expected, captor.getValue().headers().firstValue("Authorization").orElse(null));
+    }
+
+    @Test
     void testGeneratePrintPdfThrowsWhenCustomerDataFetchFails() throws Exception {
         when(httpClient.send(any(HttpRequest.class), any())).thenAnswer(invocation -> mockHttpResponse(500, "{}".getBytes(StandardCharsets.UTF_8)));
 
@@ -235,5 +274,92 @@ class InteractiveCommunicationServiceImplTest {
             () -> service.generatePrintPdf("/content/dam/formsanddocuments/ic/AcmeApp/account-statement", "CUST-6"));
         assertNotNull(e.getCause());
         assertInstanceOf(ICException.class, e.getCause());
+    }
+
+    // --- OutputService fallback (printChannelRenderService unbound) --------
+
+    @Test
+    void testGeneratePrintPdfFallsBackToOutputServiceWhenPrintChannelUnbound() throws Exception {
+        setField("printChannelRenderService", null);
+        when(httpClient.send(any(HttpRequest.class), any()))
+            .thenAnswer(invocation -> mockHttpResponse(200, "{\"customer\":{\"name\":\"Jane\"}}".getBytes(StandardCharsets.UTF_8)));
+        byte[] renderedBytes = "%PDF-fallback".getBytes(StandardCharsets.UTF_8);
+        when(outputService.generatePDFOutput(anyString(), any(Document.class), any(PDFOutputOptions.class)))
+            .thenReturn(new InMemoryDocument(renderedBytes));
+
+        byte[] result = service.generatePrintPdf("/content/dam/formsanddocuments/RealTestApp/dor-template.xdp", "CUST-7");
+
+        assertArrayEquals(renderedBytes, result);
+        verifyNoInteractions(printChannelRenderService);
+    }
+
+    @Test
+    void testGeneratePrintPdfFallbackConvertsJsonCustomerDataToXml() throws Exception {
+        setField("printChannelRenderService", null);
+        when(httpClient.send(any(HttpRequest.class), any()))
+            .thenAnswer(invocation -> mockHttpResponse(200,
+                "{\"customer\":{\"name\":\"Jane\",\"id\":\"CUST-8\"}}".getBytes(StandardCharsets.UTF_8)));
+        when(outputService.generatePDFOutput(anyString(), any(Document.class), any(PDFOutputOptions.class)))
+            .thenReturn(new InMemoryDocument("bytes".getBytes(StandardCharsets.UTF_8)));
+
+        service.generatePrintPdf("/content/dam/formsanddocuments/RealTestApp/dor-template.xdp", "CUST-8");
+
+        org.mockito.ArgumentCaptor<Document> captor = org.mockito.ArgumentCaptor.forClass(Document.class);
+        verify(outputService).generatePDFOutput(anyString(), captor.capture(), any(PDFOutputOptions.class));
+        String xml = new String(captor.getValue().getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(xml.startsWith("<?xml"));
+        assertTrue(xml.contains("<data>"));
+        assertTrue(xml.contains("<customer>"));
+        assertTrue(xml.contains("<name>Jane</name>"));
+        assertTrue(xml.contains("<id>CUST-8</id>"));
+    }
+
+    @Test
+    void testGeneratePrintPdfFallbackPassesTemplatePathAndConfiguredLocale() throws Exception {
+        setField("printChannelRenderService", null);
+        setField("locale", "fr");
+        when(httpClient.send(any(HttpRequest.class), any()))
+            .thenAnswer(invocation -> mockHttpResponse(200, "{}".getBytes(StandardCharsets.UTF_8)));
+        when(outputService.generatePDFOutput(anyString(), any(Document.class), any(PDFOutputOptions.class)))
+            .thenReturn(new InMemoryDocument("bytes".getBytes(StandardCharsets.UTF_8)));
+
+        service.generatePrintPdf("/content/dam/formsanddocuments/RealTestApp/dor-template.xdp", "CUST-9");
+
+        org.mockito.ArgumentCaptor<String> pathCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<PDFOutputOptions> optionsCaptor = org.mockito.ArgumentCaptor.forClass(PDFOutputOptions.class);
+        verify(outputService).generatePDFOutput(pathCaptor.capture(), any(Document.class), optionsCaptor.capture());
+        // crx:// prefix required - confirmed live: a bare repository path
+        // fails with AEM_OUT_001_020 "Invalid template" / FileResource
+        // "No File Found".
+        assertEquals("crx:///content/dam/formsanddocuments/RealTestApp/dor-template.xdp", pathCaptor.getValue());
+        assertEquals("fr", optionsCaptor.getValue().getLocale());
+    }
+
+    @Test
+    void testGeneratePrintPdfFallbackThrowsWhenOutputServiceThrows() throws Exception {
+        setField("printChannelRenderService", null);
+        when(httpClient.send(any(HttpRequest.class), any()))
+            .thenAnswer(invocation -> mockHttpResponse(200, "{}".getBytes(StandardCharsets.UTF_8)));
+        when(outputService.generatePDFOutput(anyString(), any(Document.class), any(PDFOutputOptions.class)))
+            .thenThrow(mock(OutputServiceException.class));
+
+        InteractiveCommunicationException e = assertThrows(InteractiveCommunicationException.class,
+            () -> service.generatePrintPdf("/content/dam/formsanddocuments/RealTestApp/dor-template.xdp", "CUST-10"));
+        assertNotNull(e.getCause());
+        assertInstanceOf(OutputServiceException.class, e.getCause());
+    }
+
+    @Test
+    void testGeneratePrintPdfStillPrefersPrintChannelWhenBothAvailable() throws Exception {
+        // printChannelRenderService is bound (default setUp) - the fallback
+        // must not be used just because OutputService is also available.
+        when(httpClient.send(any(HttpRequest.class), any()))
+            .thenAnswer(invocation -> mockHttpResponse(200, "{}".getBytes(StandardCharsets.UTF_8)));
+        when(printChannelRenderService.renderPdf(anyString(), any(Document.class), isNull(), any(IcPdfRenderOptions.class)))
+            .thenReturn(new InMemoryDocument("bytes".getBytes(StandardCharsets.UTF_8)));
+
+        service.generatePrintPdf("/content/dam/formsanddocuments/ic/AcmeApp/account-statement", "CUST-11");
+
+        verifyNoInteractions(outputService);
     }
 }
