@@ -15,6 +15,7 @@
   "dependencies": {
     "@aemforms/af-react-components": "^0.22.0",
     "@aemforms/af-react-renderer": "^0.22.0",
+    "@aemforms/af-react-vanilla-components": "^1.0.23",
     "@adobe/react-spectrum": "3.46.2",
     "@spectrum-icons/workflow": "4.2.28",
     "@react-spectrum/provider": "3.10.14",

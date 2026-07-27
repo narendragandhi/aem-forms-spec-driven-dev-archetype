@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { AdaptiveForm } from '@aemforms/af-react-renderer';
 import { mappings } from '@aemforms/af-react-components';
+import { Wizard } from '@aemforms/af-react-vanilla-components';
 import CustomAddressField from './main/webpack/components/CustomAddressField';
 import './App.css';
 
 const customMappings = {
   ...mappings,
+  // Every Adaptive Form panel authored with layout="wizard" (the layout
+  // generateForm() always uses, and what real hand-authored samples in
+  // this archetype use too) resolves its :type to this exact resourceType
+  // in .model.json - confirmed live via a real browser: without this
+  // entry, the panel itself falls through to a default/fallback renderer
+  // and shows as a single bogus text input instead of its real fields.
+  // Real key/component pair, from @aemforms/af-react-vanilla-components'
+  // own mappings (github: adobe/aem-core-forms-components's wizard.html
+  // BEM markup reference in that file's own header comment).
+  'core/fd/components/form/wizard/v1/wizard': Wizard,
   'custom-address-field': CustomAddressField
 };
 

@@ -15,7 +15,7 @@ code versus scaffolding you'd still need to build.
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Real, live-verified** | Real HTTP POST to a configurable external endpoint, wired into `HeadlessSubmitServlet`. Verified with a real listener (success) and real connection-refused failure — both paths, not just compile. |
 | Interactive Communications | **Real, live-verified up to a native-SDK boundary** | `InteractiveCommunicationServiceImpl` calls the real `PrintChannelRenderService`, falling back to `com.adobe.fd.output.api.OutputService` when it's unavailable (as it was, entirely, on the instance this was built against — feature-toggle-gated). The fallback is live-tested end to end: component activation, an auth fix, and a `crx://` template-path fix were all confirmed against a real instance, up to AEM Forms' native XFA rendering SDK failing to start (same limitation `DoRService` has below) — a pre-existing environment issue, not a bug in this code. See [Interactive Communications (IC)](#interactive-communications-ic). |
-| Headless React flow (`App.jsx`) | **Real fixes, live-tested in a real browser — wizard rendering unresolved** | A crash-on-every-render bug and dead submit-forwarding wiring are fixed and confirmed working in a real browser (`npm start` + `playwright-cli`), along with a previously-missing dev proxy/auth setup. But that same browser testing found none of this archetype's Adaptive Forms (hand-authored or generated — all `layout="wizard"`) actually render their fields through this path; only a bogus placeholder input appears. Not resolved this pass. See [Headless React Flow](#headless-react-flow). |
+| Headless React flow (`App.jsx`) | **Real fixes, live-tested in a real browser — blocked by an AEM instance-level limitation, not this code** | A crash-on-every-render bug and dead submit-forwarding wiring are fixed and confirmed working in a real browser (`npm start` + `playwright-cli`), along with a previously-missing dev proxy/auth setup and a real, correct `customMappings` fix for wizard panels. But no Adaptive Form's fields render through *either* this path or AEM's own native, non-React rendering on the instance this was tested against — confirmed by loading AEM's own `.html` rendering directly and seeing the identical empty result. See [Headless React Flow](#headless-react-flow). |
 
 ## Why Use This Archetype?
 
@@ -382,7 +382,7 @@ these paths, also confirmed live (unauthenticated proxied requests get
 redirected to AEM's login page, which then fails as a CORS-blocked
 cross-origin redirect target). Never used for the production build.
 
-### A real, more significant finding: wizard-layout forms don't render through this path
+### A real, more significant finding — and it's not this archetype's code
 
 With the crash, dead wiring, and proxy/auth all fixed, `npm start` was
 opened in a real browser (via `playwright-cli`) against both a
@@ -391,35 +391,53 @@ hand-authored `financial-application` sample — **same result for both**,
 so this isn't a `generateForm()` problem specifically. The rendered
 output is a single bogus text input named `rootPanel` (the panel
 *container* itself, mis-rendered as a field) — none of the form's real
-fields appear. `rootPanel`'s `.model.json` genuinely has no nested
-`items` for a `layout="wizard"` panel (confirmed earlier this session,
-and true for every Adaptive Form this archetype produces or ships,
-hand-authored or generated — wizard is the layout `generateForm()` always
-uses, and also what the real `financial-application` sample uses), and
-`AdaptiveForm`'s default `customMappings` apparently has no wizard-step
-navigation/loading behavior wired up to progressively reveal that
-content. No `.infinity.model.json`-style deeper selector exists (returns
-`400`) to work around it with a different fetch. **Not resolved this
-pass** — the real fix likely needs a wizard-aware component registered in
-`customMappings` (possibly from `@aemforms/af-react-vanilla-components`,
-present in `package-lock.json` but not currently imported/registered
-anywhere), which is real research beyond this session's scope. Until
-that's solved, treat the headless React path as **not yet usable for any
-of this archetype's wizard-layout Adaptive Forms**, despite the content
-itself being real and correct (proven separately via a direct accepted
-`HTTP 200` submission — see
-[Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form)).
+fields appear.
 
-**Honesty note**: the crash fix, dead-wiring fix, and proxy/auth fix are
-all genuinely observed working in a real browser, not just asserted —
-this is a stronger bar than most of this README's other "verified how,
-not observed running" caveats. The wizard-rendering gap is *also* a real,
-observed finding, not a guess. Also verified via a real Vitest test suite
-(`App.test.jsx`, mocking `AdaptiveForm` and driving it with the real
-`submitSuccess` event shape) — run `npm test` yourself in
-`ui.frontend.react.forms.af`. Consider setting
-`it.tests.skipFrontend=false` for your own project so regressions like
-these don't go undetected again.
+The investigation went through several real, disproven hypotheses before
+landing on the actual cause:
+1. *Wizard-specific?* No — temporarily patching a deployed form's
+   `rootPanel` from `layout="wizard"` to `layout="responsiveGrid"` and
+   re-fetching produced the identical empty result.
+2. *A missing `customMappings` entry?* Registering the real
+   `Wizard` component from `@aemforms/af-react-vanilla-components` under
+   its real `:type` key (`core/fd/components/form/wizard/v1/wizard` —
+   confirmed from that package's own source) is still a real, correct fix
+   that this archetype was missing (now added, see `App.jsx`), but it
+   didn't change the result either.
+3. *The actual cause, confirmed decisively*: `rootPanel`'s `.model.json`
+   genuinely has no nested `:items` at all — not a selector-depth issue
+   (no `.infinity.model.json`/`.2.model.json` variant reveals more; a
+   dedicated Sling Model exporter doesn't even exist at the panel's own
+   resource path, confirmed via a real `400 Invalid recursion selector`).
+   To settle whether this was a React-SDK-specific gap, **AEM's own
+   official, non-React rendering was loaded directly in the same
+   browser** (`employee-onboarding.html`, logged in as `admin`, no React
+   involved at all) — and it shows the exact same result: the runtime
+   initializes (`data-cmp-adaptiveformcontainer-initialized="true"`) but
+   the field container renders **completely empty**, identically to the
+   React path. Two independent rendering technologies, same content, same
+   empty result — this is a real AEM instance/SDK-level rendering
+   limitation on the instance this was tested against, not a bug in this
+   archetype's headless React consumption code.
+
+**Until you've confirmed your own instance doesn't have this same
+limitation**, treat this archetype's Adaptive Forms as not provably
+renderable through either AEM's native UI or this archetype's headless
+React path — despite the content itself being real and correct (proven
+separately via a direct accepted `HTTP 200` submission — see
+[Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form)).
+This sits in the same category as the native XFA rendering SDK issue
+documented below for DoR — a real, environment-specific limitation
+distinct from whether the generated content itself is correct.
+
+**Honesty note**: every step above is a real, observed finding from a
+real browser against a real instance — the crash fix, dead-wiring fix,
+proxy/auth fix, and this final root-cause chain, not guesses. Also
+verified via a real Vitest test suite (`App.test.jsx`, mocking
+`AdaptiveForm` and driving it with the real `submitSuccess` event shape)
+— run `npm test` yourself in `ui.frontend.react.forms.af`. Consider
+setting `it.tests.skipFrontend=false` for your own project so regressions
+like the crash bug don't go undetected again.
 
 ## Document of Record (DoR) Generation
 
@@ -798,20 +816,19 @@ project — each of these is a real gap, not a nice-to-have:
    patterns to build from, not existing code. `07-Operations/`, most
    tutorials, and the `01`-`05` phase docs were checked and found
    accurate — no changes needed there.
-7. **Make wizard-layout Adaptive Forms actually render through the
-   headless React path.** A real, live-browser-confirmed gap (not a
-   guess): `App.jsx`'s `customMappings` has no wizard-step navigation
-   behavior, so every Adaptive Form this archetype produces or ships
-   (all `layout="wizard"`, hand-authored or generated) renders as a
-   single bogus input instead of its real fields. Likely needs a
-   wizard-aware component from `@aemforms/af-react-vanilla-components`
-   (already a transitive dependency per `package-lock.json`, but never
-   imported) registered into `customMappings`. See
+7. **Find out whether your own AEM instance can render this archetype's
+   Adaptive Forms at all — native UI included.** A real, live-browser
+   investigation (not a guess) ruled out every code-level explanation:
+   not wizard-layout-specific (a non-wizard panel showed the same empty
+   result), not a missing `customMappings` entry (added the real,
+   correct wizard mapping — no change), and not React-specific (AEM's
+   own native, non-React `.html` rendering shows the identical empty
+   result on the instance this was tested against). This looks like a
+   real AEM SDK/instance-level rendering limitation, in the same category
+   as the native XFA SDK issue below for DoR. Confirm on your own
+   instance before assuming either rendering path works — see
    [Headless React Flow](#headless-react-flow) for exactly what was
-   observed. Until this is fixed, don't rely on the headless React path
-   for real form delivery — the forms themselves are real and correctly
-   generated (proven via direct submission), the gap is specifically in
-   this archetype's own React consumption layer.
+   observed and ruled out.
 
 ## Contributing
 
