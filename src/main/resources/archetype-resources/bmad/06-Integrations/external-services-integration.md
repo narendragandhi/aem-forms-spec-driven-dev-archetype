@@ -1,5 +1,13 @@
 # External Services Integration
 
+> **None of the integrations below are implemented in this archetype.**
+> No Salesforce, Dynamics, FDM-middleware, Analytics, translation, commerce,
+> or email service code exists in `core/`. The closest real thing is
+> `MockFinanceDataServlet` — a deliberately-named mock REST endpoint used
+> by `InteractiveCommunicationServiceImpl`. Read everything below as
+> reference patterns for building a real integration, not as what's
+> already wired up.
+
 This document provides patterns and examples for integrating AEM with external enterprise services including CRM platforms, analytics tools, translation services, and other third-party APIs.
 
 ## Table of Contents
@@ -176,7 +184,7 @@ type Mutation {
 
 ```javascript
 // React component using GraphQL FDM
-import { useAdaptiveForm } from '@adobe/aem-forms-af-react';
+import { useAdaptiveForm } from '@aemforms/af-react-renderer'; // illustrative - verify this hook exists before relying on it
 
 const CustomerList = () => {
     const { data, submit } = useAdaptiveForm({

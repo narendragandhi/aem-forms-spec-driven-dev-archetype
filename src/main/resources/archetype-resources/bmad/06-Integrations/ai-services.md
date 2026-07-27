@@ -1,5 +1,9 @@
 # AI Services Integration
 
+> **Reference pattern, not implemented.** Code samples here (e.g.
+> `LLMServiceImpl`, `ClaudeServiceImpl`) are illustrative integration
+> patterns for building this yourself — none of it exists in `core/`.
+
 This guide covers integrating Large Language Model (LLM) services into AEM for content creation, translation, and intelligent content management. The architecture supports multiple LLM providers through a unified abstraction layer.
 
 ## Architecture Overview

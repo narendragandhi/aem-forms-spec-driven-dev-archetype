@@ -1,5 +1,12 @@
 # OSGi Services for AEM Integrations
 
+> **Reference pattern, not implemented.** Code samples here are general
+> guidance, not existing code in `core/` — cross-check any specific class
+> name against the real source before assuming it exists. For real,
+> shipped examples of this archetype's own OSGi services, see
+> `AdobeSignOrchestratorImpl`, `FormSubmissionService`, and
+> `InteractiveCommunicationServiceImpl`.
+
 This document covers OSGi service patterns and best practices for creating reusable, configurable integration services in AEM as a Cloud Service.
 
 ## Table of Contents

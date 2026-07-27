@@ -1,5 +1,10 @@
 # Integration Best Practices
 
+> **Reference pattern, not implemented.** Code samples here are general
+> guidance for building integrations, not existing code in `core/` —
+> cross-check any specific class name against the real source before
+> assuming it exists.
+
 This document outlines AEM-specific best practices for building robust, maintainable integrations with external services. Following these patterns ensures reliability, performance, and observability in production environments.
 
 ## Table of Contents

@@ -1,5 +1,11 @@
 # REST API Integration Patterns for AEM
 
+> **Reference pattern, not implemented.** Code samples here are general
+> guidance, not existing code in `core/`. For real, shipped examples of
+> this archetype's own outbound REST calls, see `FormSubmissionService`
+> and `AdobeSignOrchestratorImpl` (both use `java.net.http.HttpClient`
+> directly, no extra HTTP client dependency).
+
 This document provides comprehensive patterns for implementing REST APIs in AEM as a Cloud Service, including inbound APIs (exposing AEM data) and outbound integrations (consuming external services).
 
 ## Table of Contents

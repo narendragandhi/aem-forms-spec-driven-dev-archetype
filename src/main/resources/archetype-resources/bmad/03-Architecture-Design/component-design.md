@@ -26,13 +26,19 @@ ui.apps/src/main/content/jcr_root/apps/{app-id}/components/adaptiveForm/{compone
 
 **Resource Type**: `aem-forms-bmad-showcase/components/adaptiveForm/addresslookup`
 
-**Frontend (React Component)**: Located at `ui.frontend.react.forms.af/src/main/webpack/components/CustomAddressField.js`.
+**Frontend (React Component)**: Located at `ui.frontend.react.forms.af/src/main/webpack/components/CustomAddressField.jsx`.
+As shipped, this is an explicitly-commented **non-functional placeholder** —
+it renders the input but has no real address-lookup API call wired up.
+Treat the "Key Responsibilities" below as the design target, not what's
+currently implemented.
 
-The component is built with React and uses the `@aem-forms/af-react-components` library to integrate with the Adaptive Forms framework.
+The component is built with React and uses the real
+`@aemforms/af-react-components` library (not `@aem-forms/...` — that
+package doesn't exist) to integrate with the Adaptive Forms framework.
 
 ```javascript
 import React, { useState } from "react";
-import { Field } from "@aem-forms/af-react-components";
+import { Field } from "@aemforms/af-react-components";
 
 const CustomAddressField = ({
   label,
@@ -71,7 +77,7 @@ The authoring dialog allows form creators to configure the component's behavior.
 
 **Backend (Supporting OSGi Service)**:
 
-While most of the logic is in the frontend, a backend OSGi service is recommended for security and configuration management.
+While most of the logic is in the frontend, a backend OSGi service is recommended for security and configuration management. **Not implemented in this archetype** — the class below is a design sketch to build, not existing code.
 
 `com.example.forms.services.AppConfigurationService`
 ```java

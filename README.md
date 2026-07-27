@@ -1,6 +1,6 @@
 # AEM Forms BMAD Archetype
 
-A Maven archetype for creating AI-ready AEM Forms projects using the **BMAD** (Business-Model-Architecture-Development) methodology.
+A Maven archetype for creating AI-ready AEM Forms projects using the **BMAD** (Breakthrough Method for Agile Development — [bmad-code-org/BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)) methodology, adapted here for AEM Forms alongside [GasTown](https://github.com/steveyegge/gastown) (multi-agent orchestration) and [Beads](https://github.com/steveyegge/beads) (BEAD task tracking) — see `bmad/methodologies/BMAD-BEAD-GasTown.md` for how the three fit together.
 
 ## Implementation Status
 
@@ -617,7 +617,10 @@ The generated project is Cloud Manager ready:
 
 ### Creating Custom Prompts
 
-Add BEAD (Business Entity AI Definition) files:
+Add a custom AI prompt/spec file (unrelated to the real BEAD task-tracking
+system under `bmad/gastown/bead/` — despite the shared `.bead.md`
+extension here, this is just a naming collision in this example, not the
+same thing):
 
 ```markdown
 # bmad/custom/my-feature.bead.md
@@ -681,19 +684,22 @@ project — each of these is a real gap, not a nice-to-have:
    property names rather than guessed ones. `generate()` (the
    single-component path) also now auto-registers its React output in
    `App.jsx` — see [Implementation Status](#implementation-status).
-6. **Finish reconciling the `bmad/` guides with reality.** Partially done:
-   `SUMMARY.md` was rewritten to match real status, and
-   `interactive-communications-guide.md`, `omnichannel-architecture.md`,
-   `enterprise-hardening-guide.md`, and `PRODUCTION-READINESS-BACKLOG.md`
-   (which turned out to reference a different project's file paths
-   entirely) got correction banners rather than full rewrites — there are
-   80+ docs under `bmad/` total, and only the ones directly referencing
-   features this session investigated were checked. A full audit of the
-   rest (tutorials, other `06-Integrations/` guides, `07-Operations/`)
-   hasn't happened. Since these are meant to brief an AI assistant before
-   it writes code, an aspirational doc read as fact will make the next
-   person's (or the next AI's) starting assumptions wrong in exactly the
-   way this session's audit found.
+6. ~~Finish reconciling the `bmad/` guides with reality.~~ Done — every
+   `.md` file under `bmad/` (~90 total) has now been checked against the
+   real code, not just the ones features this session touched directly.
+   Fixed: stale "mock" labels on now-real services (`HeadlessSubmitServlet`),
+   a nonexistent npm package (`@aem-forms/af-react-components` /
+   `@adobe/aem-forms-af-react*` — the real one is `@aemforms/...`,
+   no hyphen) repeated across half a dozen files, a traceability matrix
+   citing Sling Models/tests that don't exist anywhere in the repo (fixed
+   with a "worked example" note) plus a DRM row overclaiming something
+   never implemented, an internally-inconsistent BEAD acronym, a
+   superseded GasTown setup guide, and correction banners across the
+   generic integration-pattern docs (AI services, Analytics, Target,
+   GraphQL, REST patterns, OSGi patterns) clarifying they're reference
+   patterns to build from, not existing code. `07-Operations/`, most
+   tutorials, and the `01`-`05` phase docs were checked and found
+   accurate — no changes needed there.
 
 ## Contributing
 

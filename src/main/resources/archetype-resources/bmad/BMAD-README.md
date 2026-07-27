@@ -2,6 +2,20 @@
 
 This document outlines the BMAD v6 methodology, tailored for AEM Forms projects. BMAD provides a structured, AI-driven, and agile framework for developing AEM Forms solutions using Agent-as-Code patterns.
 
+## Attribution
+
+This project adapts three independent open-source methodologies/tools for
+AEM Forms, rather than inventing them:
+
+- **BMAD** — [bmad-code-org/BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)
+- **GasTown** (multi-agent orchestration, under `bmad/gastown/`) —
+  [steveyegge/gastown](https://github.com/steveyegge/gastown)
+- **Beads / BEAD** (git-backed AI task tracking, under `bmad/gastown/bead/`) —
+  [steveyegge/beads](https://github.com/steveyegge/beads)
+
+See `bmad/methodologies/BMAD-BEAD-GasTown.md` for how the three fit
+together in this project specifically.
+
 ## What's New in v6
 
 - **Agent-as-Code**: All agents use YAML frontmatter with `mode: primary` for IDE integration

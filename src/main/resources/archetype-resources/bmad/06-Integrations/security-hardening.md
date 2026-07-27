@@ -88,7 +88,7 @@ For forms requiring Adobe Acrobat Sign:
 
 ```javascript
 // React component with reCAPTCHA
-import { useReCAPTCHA } from '@adobe/aem-forms-af-react-components';
+import { useReCAPTCHA } from '@aemforms/af-react-components'; // illustrative - verify this hook exists before relying on it
 
 const FormWithCaptcha = () => {
     const { execute, reset } = useReCAPTCHA({

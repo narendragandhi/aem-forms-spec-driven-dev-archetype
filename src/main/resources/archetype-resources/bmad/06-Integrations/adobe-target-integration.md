@@ -1,5 +1,9 @@
 # Adobe Target Integration
 
+> **Reference pattern, not implemented.** Code samples here are
+> illustrative integration patterns for building this yourself — no
+> Target integration exists in `core/`.
+
 This document provides comprehensive patterns and implementation guidance for integrating Adobe Target with AEM as a Cloud Service, covering personalization, A/B testing, automated optimization, and Experience Cloud integration.
 
 ## Table of Contents

@@ -1,5 +1,9 @@
 # Adobe Analytics Integration
 
+> **Reference pattern, not implemented.** Code samples here are
+> illustrative integration patterns for building this yourself — no
+> Analytics integration exists in `core/`.
+
 This document provides comprehensive patterns and implementation guidance for integrating Adobe Analytics with AEM as a Cloud Service, covering data layer architecture, event tracking, custom dimensions, and Experience Cloud integration.
 
 ## Table of Contents

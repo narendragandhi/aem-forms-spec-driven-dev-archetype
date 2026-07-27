@@ -1,5 +1,11 @@
 # GasTown: Multi-Agent Orchestration Getting Started Guide
 
+> **Superseded**: this predates the actual `gt`/`bd` CLI toolchain
+> documented under `bmad/gastown/` (see `gastown/README.md`,
+> `gastown/bead/README.md`, `gastown/DASHBOARD.md`). Where this document
+> describes a generic message-queue-based design, the real system is the
+> concrete GasTown CLI — read that first.
+
 This document provides a conceptual guide for setting up a multi-agent orchestration system, referred to as "GasTown," to power the BMAD and BEAD methodologies.
 
 ## Core Concepts

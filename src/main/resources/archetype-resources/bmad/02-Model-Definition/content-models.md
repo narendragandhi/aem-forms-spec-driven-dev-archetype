@@ -70,6 +70,16 @@ Themes control the look and feel (styling) of the forms, ensuring brand consiste
 
 These are custom React components developed to provide functionality beyond the out-of-the-box components. They are developed in the `ui.frontend.react.forms.af` module.
 
+**Status check before relying on these**: only the Address Lookup field
+has a shipped counterpart, `CustomAddressField.jsx` — and it's an
+explicitly-commented **non-functional placeholder** (renders the input,
+no real address API call wired up). There is no E-Sign form *field*
+component in this repo at all — don't confuse it with the real, separate
+Adobe Sign backend integration (`AdobeSignOrchestratorImpl`), which
+signs a submitted PDF server-side, not a canvas/typed-signature capture
+field. Treat both sections below as design specs to build, not
+inventory of what ships.
+
 ### Address Lookup Component
 
 - **Resource Type**: `aem-forms-bmad-showcase/components/adaptiveForm/address-lookup`

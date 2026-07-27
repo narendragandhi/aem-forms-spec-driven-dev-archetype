@@ -2,11 +2,20 @@
 
 This document explains how the BMAD, BEAD, and GasTown methodologies work together to create an AI-driven development framework for AEM projects.
 
+All three are independent open-source projects, adapted here for AEM
+Forms — not invented by this archetype:
+
+| Name | Original source |
+|---|---|
+| BMAD | [bmad-code-org/BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) |
+| GasTown | [steveyegge/gastown](https://github.com/steveyegge/gastown) |
+| Beads / BEAD | [steveyegge/beads](https://github.com/steveyegge/beads) |
+
 ## Overview
 
 - **BMAD (Breakthrough Method for Agile Development):** The primary framework that organizes the project lifecycle into distinct phases, each managed by specialized AI agents (PM, Architect, Developer, QA).
 
-- **BEAD (Behavioral-driven AI Development):** A task management system for the AI agents. It defines how work is broken down, assigned, and tracked.
+- **BEAD (Backlog for Execution by AI Developers):** A git-backed task management system for the AI agents (see `gastown/bead/README.md`). It defines how work is broken down, assigned, and tracked.
 
 - **GasTown:** A conceptual guide and framework for setting up and orchestrating the multi-agent system. It defines the "engine" that runs the BEAD tasks within the BMAD framework.
 

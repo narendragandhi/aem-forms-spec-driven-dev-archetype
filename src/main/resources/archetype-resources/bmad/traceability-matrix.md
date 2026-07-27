@@ -9,6 +9,13 @@ Business Requirement → User Story → Technical Spec → Implementation → Te
        (REQ)              (US)         (SPEC)           (CODE)        (TEST)
 ```
 
+> **Note**: The Hero and Text with Image sections below are a **worked
+> example** of how to fill out this matrix for a new component — they
+> illustrate the methodology, not code that ships with this archetype.
+> `HeroModel.java`, `hero.html`, `TextWithImageModel.java`,
+> `textwithimage.html`, and their tests don't exist in this repo. Replace
+> them with your own component's real traceability once you build one.
+
 ---
 
 ## Hero Component Traceability
@@ -92,7 +99,7 @@ Business Requirement → User Story → Technical Spec → Implementation → Te
 | US-FORMS-002.AC1 | Submission triggers Sign workflow | `HeadlessSubmitServlet.java` | Workflow instance check |
 | US-FORMS-002.AC2 | Live status polling in UI | `useEffect` + `/bin/bmad/headless-status` | Cypress status loop |
 | US-FORMS-003.AC1 | Unified Design Tokens applied | `variables.css` + `App.css` | Visual regression |
-| US-FORMS-003.AC2 | DRM Security Policy applied to PDF | `enterprise-hardening-guide.md` | Manual PDF audit |
+| US-FORMS-003.AC2 | DRM Security Policy applied to PDF | **Not implemented** - `enterprise-hardening-guide.md` describes this as a vision/design sketch, no real DRM code exists | N/A |
 
 ---
 
@@ -154,8 +161,8 @@ Business Requirement → User Story → Technical Spec → Implementation → Te
 
 | User Story | Tasks | Status | Code Artifacts | Test Artifacts |
 |------------|-------|--------|----------------|----------------|
-| US-CA-003 | Hero Component | Complete | `HeroModel.java`, `hero.html` | `HeroModelTest.java` |
-| US-CA-004 | Text with Image | Pending | - | - |
+| US-CA-003 | Hero Component | Example only - not implemented | `HeroModel.java`, `hero.html` | `HeroModelTest.java` |
+| US-CA-004 | Text with Image | Example only - not implemented | - | - |
 
 ---
 

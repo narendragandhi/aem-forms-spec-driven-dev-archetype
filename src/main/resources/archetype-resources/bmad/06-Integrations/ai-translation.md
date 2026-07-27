@@ -1,5 +1,9 @@
 # AI-Powered Translation Service
 
+> **Reference pattern, not implemented.** Code samples here are
+> illustrative integration patterns for building this yourself — none of
+> it exists in `core/`.
+
 This guide covers implementing AI-powered automatic translation for AEM content using Large Language Models. The approach provides high-quality, context-aware translations that outperform traditional machine translation for marketing content.
 
 ## Overview

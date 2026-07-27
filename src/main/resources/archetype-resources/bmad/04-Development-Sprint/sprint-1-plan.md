@@ -18,7 +18,7 @@ This document outlines the goals, user stories, and tasks for the first developm
 
 - **Story**: As a developer, I need to build the "Address Lookup" custom Adaptive Form component.
     - **Task (Frontend - React)**: Create the React component `CustomAddressField.js` in `ui.frontend.react.forms.af` that renders an input field and integrates with an external address suggestion API (mocked for now).
-    - **Task (Frontend - Integration)**: Wrap the React component using `@aem-forms/af-react-components` `Field` to ensure proper integration with the AEM Forms rule engine and data binding.
+    - **Task (Frontend - Integration)**: Wrap the React component using `@aemforms/af-react-components` `Field` to ensure proper integration with the AEM Forms rule engine and data binding.
     - **Task (Content - Dialog)**: Create the component dialog (`_cq_dialog/.content.xml`) with fields for `label`, `description`, and `bindRef` (FDM path).
     - **Task (Backend - Service)**: (Placeholder) Define an OSGi configuration for the external address API key and create a Sling Model to expose it securely to the frontend.
 

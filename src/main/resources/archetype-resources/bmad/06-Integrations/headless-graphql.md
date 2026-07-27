@@ -1,5 +1,11 @@
 # AEM Headless & GraphQL Integration
 
+> **Reference pattern, not implemented.** Code samples here are general
+> guidance, not existing code in `core/`. This archetype's own real
+> headless path is Adaptive Forms via `SpecToCodeGenerator.generateForm()`
+> + `@aemforms/af-react-renderer` (see `headless-forms.md`), not GraphQL
+> Content Fragments.
+
 This document provides comprehensive guidance on implementing headless content delivery using AEM as a Cloud Service. It covers Content Fragments, GraphQL APIs, and SPA integration patterns.
 
 ## Table of Contents

@@ -8,7 +8,7 @@ The headless forms architecture consists of:
 
 1.  **AEM Adaptive Form**: The source of truth for the form model.
 2.  **Headless Form Service (BFF)**: An OSGi servlet at `/bin/bmad/headless-form-service`.
-3.  **Headless Submit Servlet**: A mock servlet at `/bin/bmad/headless-submit`.
+3.  **Headless Submit Servlet**: A real servlet at `/bin/bmad/headless-submit`, backed by `FormSubmissionService` (a genuine HTTP POST to a configurable external endpoint, live-verified).
 4.  **React Frontend Module**: Located in `ui.frontend.react.forms.af`.
 
 ## Headless Forms Options
@@ -114,14 +114,14 @@ curl -X GET "https://publish-pXXX.adobeaemcloud.com/forms/forms/{formPath}/schem
 ### Installation
 
 ```bash
-npm install @adobe/aem-forms-af-react @adobe/aem-forms-af-react-components
+npm install @aemforms/af-react-renderer @aemforms/af-react-components
 ```
 
 ### Basic Usage
 
 ```jsx
-import { AdaptiveForm } from '@adobe/aem-forms-af-react';
-import { mappingJsonToAdaptiveForm } from '@adobe/aem-forms-af-react-components';
+import { AdaptiveForm } from '@aemforms/af-react-renderer';
+import { mappings } from '@aemforms/af-react-components';
 
 const MyForm = () => {
     const [form, setForm] = useState(null);
@@ -131,7 +131,7 @@ const MyForm = () => {
         fetch('/forms/forms/loan-application/schema')
             .then(res => res.json())
             .then(schema => {
-                setForm(mappingJsonToAdaptiveForm(schema));
+                setForm(schema);
             });
     }, []);
     
@@ -236,7 +236,7 @@ export class FormComponent {
 ### 1. Backend Services (Core)
 
 *   **`${package}.services.HeadlessFormService`**: Metadata orchestration for forms.
-*   **`${package}.services.HeadlessSubmitServlet`**: Mock submission handler.
+*   **`${package}.services.HeadlessSubmitServlet`**: Real submission handler, delegates to `FormSubmissionService`.
 
 ### 2. Frontend Module (React)
 
