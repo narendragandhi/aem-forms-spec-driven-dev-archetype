@@ -18,9 +18,25 @@
           "properties": {
             "street": { "type": "string", "title": "Street" },
             "city": { "type": "string", "title": "City" },
-            "zipCode": { "type": "string", "title": "Zip Code" }
+            "zipCode": { "type": "string", "title": "Zip Code", "pattern": "^[0-9]{5}$" }
           },
           "required": ["street", "city"]
+        },
+        "employeeId": {
+          "type": "string",
+          "title": "Employee ID",
+          "pattern": "^EMP-[0-9]{4}$"
+        },
+        "yearsOfExperience": {
+          "type": "integer",
+          "title": "Years of Experience",
+          "minimum": 0,
+          "maximum": 40
+        },
+        "skills": {
+          "type": "array",
+          "title": "Skills",
+          "items": { "type": "string" }
         }
       },
       "required": ["fullName", "email", "startDate"]

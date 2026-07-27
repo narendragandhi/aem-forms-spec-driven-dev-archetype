@@ -229,8 +229,11 @@ same JSON Schema handling:
   ]
 }
 ```
-See `specs/employee-onboarding.json` for a full worked example (two
-panels, a nested object, a repeatable object array). Generates to
+See `specs/employee-onboarding.json` for a full worked example — two
+panels, a nested object, a repeatable object array (`contacts`), a
+repeatable scalar array (`skills`), and validation constraints
+(`pattern` on `employeeId`/`zipCode`, `minimum`/`maximum` on
+`yearsOfExperience`) all in one spec. Generates to
 `ui.content/.../content/forms/af/<appName>/<slug>/.content.xml`.
 
 The real content shape (panels, `table`/`tablerow` for repeatable object
