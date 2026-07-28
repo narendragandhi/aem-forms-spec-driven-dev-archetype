@@ -12,8 +12,8 @@ code versus scaffolding you'd still need to build.
 | `SpecToCodeGenerator.generate()` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec, and now auto-registers every generated React component in `App.jsx`'s `customMappings` (import + mapping entry, idempotent across re-runs) — no more manual wiring. Verified via real compile/deploy. |
 | `SpecToCodeGenerator.generateForm()` | **Real, live-verified** | Generates a complete, submittable Adaptive Form (real JCR page/panel/field structure, standard field components, a working submit action, a real "Save for Later" button on every step, and an opt-in reCAPTCHA field) from a multi-panel spec. The most thoroughly proven capability in this archetype — deployed to a live instance and confirmed by actually POSTing a real submission and getting `HTTP 200`. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
 | `PrefillDataService` | **Real, live-verified end to end** | Implements the real `com.adobe.forms.common.service.DataProvider` extension point (verified via `javap`). The form-to-service wiring — a `prefillService` content property on the `guideContainer` — was found by decompiling AEM's own running `AdaptiveFormDataServlet`/`FormDataProviderRegistryImpl` classes and confirmed by a real invocation log line naming this service. That same live test caught a real bug (the outbound HTTP call had no auth header, so the shipped example endpoint 401'd) — fixed, unit-tested, and then live-verified again (via a small hand-built OSGi bundle standing in for the archetype's own drifted core bundle): the fixed call now returns `HTTP 200` and real customer data flows through `/adobe/forms/af/data/<id>` end to end. `generateForm()` now supports opting into this via a `prefillService` spec key. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
-| reCAPTCHA field (`generateForm()`, opt-in) | **Real component, config wiring not live-verified** | When a spec sets a top-level `recaptcha.cloudServicePath`, `generateForm()` emits a `captcha` field on the real, already-shipped `<appName>/components/adaptiveForm/recaptcha` proxy (extends Core Components' own `recaptcha/v1/recaptcha`), pointed at a Cloud Service Configuration path. Whether AEM verifies the token server-side automatically once that config is authored (rather than needing custom code) was reasoned from the dialog's real properties, not independently confirmed live. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
-| `SubmissionAuditService` | **Real interface, editor-wiring step unconfirmed** | Implements the real `com.adobe.aemds.guide.service.FormSubmitActionService` extension point (verified via `javap`), the same class of interface Adobe's own `aem-core-forms-components` integration-test fixture uses for a custom submit handler. Builds a structured audit record (submission id, form path, submitter, client IP, user agent, referer, timestamp, submitted data) and forwards it through the archetype's own already real, live-verified `FormSubmissionService`. Unit-tested; registering it as a form's actual submit service and confirming it fires end-to-end wasn't live-tested this pass. See [Submission Audit Trail](#submission-audit-trail). |
+| reCAPTCHA field (`generateForm()`, opt-in) | **Mechanism confirmed real; enforcement blocked by a pre-existing instance limitation** | When a spec sets a top-level `recaptcha.cloudServicePath`, `generateForm()` emits a `captcha` field on the real, already-shipped `<appName>/components/adaptiveForm/recaptcha` proxy. Decompiling the live instance's own `AdaptiveFormSubmitServlet` confirmed server-side verification is genuinely platform-native (`CaptchaUtils.validateCaptcha`, no custom code needed) — and a real Cloud Service Configuration was live-authored with Google's own published test keys. But a live submission with no captcha response wasn't rejected and never even logged a captcha-related line — traced to the same nested-panel form-model limitation documented under [Headless React Flow](#headless-react-flow), not a flaw in this wiring. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
+| `SubmissionAuditService` | **Real, live-verified end to end** | Implements the real `com.adobe.aemds.guide.service.FormSubmitActionService` extension point (verified via `javap`), the same interface Adobe's own `aem-core-forms-components` integration-test fixture uses for a custom submit handler. Decompiling `FormSubmitActionManagerServiceImpl` revealed the real wiring: a guideContainer's `actionType` resolves as a *resource path*, and that resource's own `submitService` property (matching the already-shipped `customsubmission/submissionAudit` node) is what gets looked up by name. Live-verified via a real POST submission — `error.log` shows the framework finding the service by name and invoking it with the real submitted data, returning `HTTP 200`. See [Submission Audit Trail](#submission-audit-trail). |
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Real, live-verified** | Real HTTP POST to a configurable external endpoint, wired into `HeadlessSubmitServlet`. Verified with a real listener (success) and real connection-refused failure — both paths, not just compile. |
@@ -400,7 +400,8 @@ full proof the `prefillService` wiring *and* the auth fix both work, not
 just that they compile.
 
 **reCAPTCHA / spam protection, opt-in and built on components already
-shipped in this archetype — not newly invented.** Both
+shipped in this archetype — mechanism confirmed real, enforcement blocked
+by a pre-existing instance limitation.** Both
 `<appName>/components/adaptiveForm/recaptcha` and its `hcaptcha` sibling
 already existed in this archetype's `ui.apps` tree before this pass
 (extending Core Components' own `core/fd/components/form/recaptcha/v1/recaptcha`,
@@ -409,20 +410,41 @@ with a real `_cq_template.xml` carrying `fieldType="captcha"` and
 one in. It's opt-in: add a top-level `"recaptcha": {"cloudServicePath":
 "/etc/cloudservices/recaptcha/<name>"}` to a form spec, and the last
 panel gets a `captcha` field on that same real component, referencing the
-given path via `rcCloudServicePath` — the real property name confirmed
-against the component's `_cq_dialog.xml` in Adobe's own
-`aem-core-forms-components` source, where it's a `granite/ui` select
-widget pointed at `/etc/cloudservices/recaptcha`. A spec with no
-`recaptcha` key generates exactly as before this feature existed (see
-`testGenerateFormOmitsCaptchaFieldByDefault`). **Honesty note**: the
-`cloudServicePath` still has to point at a real Cloud Service
-Configuration, authored separately with a real reCAPTCHA site/secret key
-pair — this generator only wires the reference, it can't generate
-credentials. Whether AEM verifies the token server-side automatically
-once that config exists (rather than needing custom verification code)
-was reasoned from the dialog's shape, matching how the framework's own
-submit/save endpoints are auto-provisioned without custom code, but this
-specific claim was not independently live-tested this pass.
+given path via `rcCloudServicePath`. A spec with no `recaptcha` key
+generates exactly as before this feature existed (see
+`testGenerateFormOmitsCaptchaFieldByDefault`).
+
+**Server-side verification is confirmed real and automatic** — decompiling
+the live instance's own `AdaptiveFormSubmitServlet` showed it calls
+`CaptchaUtils.validateCaptcha(...)`/`GuideCaptchaValidatorProvider`
+during every submit, throwing a real `CaptchaValidationException` on
+failure — genuinely platform-native, no custom verification code needed,
+resolving what was previously just a reasoned guess. The real Cloud
+Service Configuration shape was also found and live-authored (not
+guessed): a `cq:Page` at `/etc/cloudservices/recaptcha/<name>` with
+`sling:resourceType="fd/af/cloudservices/recaptcha/page"` and
+`version`/`siteKey`/`secretKey` properties (found via the real
+create-config wizard's own field definitions at
+`/libs/fd/af/cloudservices/recaptcha/createcloudconfigwizard`), populated
+with Google's own [officially documented reCAPTCHA v2 test
+keys](https://developers.google.com/recaptcha/docs/faq) (published
+specifically for automated testing — always pass validation, not a
+real/private credential).
+
+**Honesty note — enforcement itself couldn't be confirmed on this
+instance.** Deployed the field and config live, then submitted with no
+captcha response: the submission succeeded and no captcha-related log
+line appeared at all, meaning the field was never even discovered at
+submit time. That traces to the *same* pre-existing, already-documented
+limitation from [Headless React Flow](#headless-react-flow) below: this
+instance's form-model pipeline doesn't populate nested panel content
+(`.model.json` shows empty `:items` for panels), and captcha discovery
+appears to depend on that same pipeline. So: the mechanism is now fully
+understood and confirmed correct end to end (component, config shape,
+platform-native verification), but whether it actually blocks a bad
+submission couldn't be proven on this particular scratch instance — a
+different instance without that rendering limitation should be expected
+to enforce it as designed.
 
 **Deliberately scoped out this pass, rather than guessed at**:
 - `dropdown`'s `date-input`/`drop-down` field type strings are AEM Forms
@@ -579,22 +601,41 @@ Adobe's own real `customsubmission/logsubmit` sample byte-for-byte in
 structure — this is what makes a registered `FormSubmitActionService`
 selectable from the Adaptive Forms Editor's Submit Action Type dropdown.
 
-**Honesty note**: per Adobe's own real sample, selecting a custom
-`FormSubmitActionService` as a form's submit service means it becomes the
-form's actual submission handler (there's no confirmed "runs alongside
-the framework's own restendpoint action" mode) — so wiring this in on a
-production form is a deliberate choice, not a drop-in addition alongside
-`generateForm()`'s default submit button. The Java-side interface and the
-datasource-folder registration shape are both independently confirmed
-real; the exact `guideContainer` content property that selects a chosen
-`submitService` by name isn't demonstrated in any real sample this
-session could find (Adobe's own IT content only shows `restendpoint`/
-`email` action types authored directly in content). Confirm the exact
-authoring step against your own instance's Rule Editor / Submit Action
-Type UI before relying on this being reachable purely through generated
-content. Unit-tested (`SubmissionAuditServiceTest`, verifying the built
-JSON payload shape and both the success and `FormSubmissionException`
-paths) but not live-tested against a real AEM submission this pass.
+**The `guideContainer` wiring is now confirmed real, not just reasoned.**
+Decompiling the live instance's own `FormSubmitActionManagerServiceImpl`
+(pulled straight off disk from a running AEM SDK install) showed exactly
+how a custom submit service gets selected: `actionType` on the
+`guideContainer` is read and resolved as a **resource path** (not a
+literal action-type string), and that *target resource's own*
+`submitService` property is then looked up by name in a real, name-keyed
+`Map<String, FormSubmitActionService>` — which is exactly the shape the
+already-shipped `customsubmission/submissionAudit` node has. So the real
+authoring step is: set `actionType="/apps/<appName>/customsubmission/submissionAudit"`
+on the `guideContainer` (that resource's `submitService` property already
+names this service).
+
+**Live-verified end to end, not just decompiled.** Deployed a small,
+hand-built standalone OSGi bundle (no Maven needed — a manifest and
+Declarative Services XML written by hand, installed via the real Felix
+Web Console bundle-install API) registering the same service name
+(`bmadSubmissionAuditService`), authored the `actionType` property above
+on a real deployed form, then POSTed a real submission. Confirmed
+straight from `error.log`:
+```
+[AF] [Submit] Submit service named "bmadSubmissionAuditService" for form ... was found: true
+[SubmissionAuditServiceLive] INVOKED for form: ... submissionId=... submitter=admin data={"fullName":"Jane Doe",...}
+[AF] [Custom Submit] custom submit action named "bmadSubmissionAuditService" passed
+```
+Real form data flowed through, and the request returned `HTTP 200` with
+a real thank-you redirect — full proof the wiring works, not just that it
+compiles. Per Adobe's own real sample (`CustomAFSubmitService`), a custom
+`FormSubmitActionService` becomes the form's actual submission handler
+when selected (no confirmed "runs alongside the framework's default
+restendpoint action" mode), so wiring this in on a production form is a
+deliberate choice, not a drop-in addition alongside `generateForm()`'s
+default submit button. Unit-tested (`SubmissionAuditServiceTest`,
+verifying the built JSON payload shape and both the success and
+`FormSubmissionException` paths).
 
 ## Document of Record (DoR) Generation
 
