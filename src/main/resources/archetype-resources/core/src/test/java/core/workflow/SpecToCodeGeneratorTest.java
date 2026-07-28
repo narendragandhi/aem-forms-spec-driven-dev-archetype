@@ -734,6 +734,25 @@ class SpecToCodeGeneratorTest {
             "  ]\n" +
             "}\n";
 
+    // Same panels as ONBOARDING_FORM_SPEC, plus an opt-in top-level
+    // "recaptcha" key - kept as a separate constant (rather than mutating
+    // ONBOARDING_FORM_SPEC) so every other generateForm() test keeps
+    // asserting the no-recaptcha-by-default behavior unchanged.
+    private static final String ONBOARDING_FORM_SPEC_WITH_RECAPTCHA =
+            ONBOARDING_FORM_SPEC.replace(
+                    "  ]\n}\n",
+                    "  ],\n  \"recaptcha\": { \"cloudServicePath\": \"/etc/cloudservices/recaptcha/acme\" }\n}\n");
+
+    // Same panels as ONBOARDING_FORM_SPEC, plus an opt-in top-level
+    // "prefillService" key - the real property name confirmed this
+    // session (decompiling the live AdaptiveFormDataServlet) to be what
+    // routes /adobe/forms/af/data/<id> to a specific registered
+    // DataProvider by its getServiceName().
+    private static final String ONBOARDING_FORM_SPEC_WITH_PREFILL =
+            ONBOARDING_FORM_SPEC.replace(
+                    "  ]\n}\n",
+                    "  ],\n  \"prefillService\": \"bmadPrefillDataService\"\n}\n");
+
     private Path generatedFormXml(String appName, String slug) {
         return tempDir.resolve("ui.content/src/main/content/jcr_root/content/forms/af/" + appName + "/" + slug + "/.content.xml");
     }
@@ -829,6 +848,93 @@ class SpecToCodeGeneratorTest {
         assertTrue(xml.contains("fieldType=\"button\""));
         assertTrue(xml.contains("buttonType=\"submit\""));
         assertTrue(xml.contains("click=\"[submitForm()]\""));
+    }
+
+    @Test
+    void testGenerateFormWiresRealSaveForLaterAction() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("<saveButton"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/button\""));
+        assertTrue(xml.contains("fieldType=\"button\""));
+        // base64("/content/forms/af/AcmeApp/employee-onboarding") - the same
+        // base64(page path) scheme the framework's own auto-provisioned
+        // submit action and prefill data URL use.
+        assertTrue(xml.contains(
+            "click=\"[saveForm(externalize('/adobe/forms/af/save/"
+                + "L2NvbnRlbnQvZm9ybXMvYWYvQWNtZUFwcC9lbXBsb3llZS1vbmJvYXJkaW5n'))]\""));
+    }
+
+    @Test
+    void testGenerateFormPlacesSaveButtonOnEveryPanelNotJustLast() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        // employee-onboarding.json has two panels (Personal Details,
+        // Emergency Contacts) - save-for-later needs to be reachable from
+        // both, not just the last step a user happens to reach.
+        assertEquals(2, xml.split("<saveButton", -1).length - 1,
+            "Save button should appear once per panel, not just the last one");
+    }
+
+    @Test
+    void testGenerateFormOmitsCaptchaFieldByDefault() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertFalse(xml.contains("<captcha"), "Captcha field should only be generated when the spec opts in");
+    }
+
+    @Test
+    void testGenerateFormWiresRealCaptchaFieldWhenOptedIn() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC_WITH_RECAPTCHA);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("<captcha"));
+        assertTrue(xml.contains("sling:resourceType=\"AcmeApp/components/adaptiveForm/recaptcha\""));
+        assertTrue(xml.contains("fieldType=\"captcha\""));
+        assertTrue(xml.contains("rcCloudServicePath=\"/etc/cloudservices/recaptcha/acme\""));
+        assertTrue(xml.contains("required=\"{Boolean}true\""));
+    }
+
+    @Test
+    void testGenerateFormPlacesCaptchaFieldOnlyOnLastPanel() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC_WITH_RECAPTCHA);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertEquals(1, xml.split("<captcha", -1).length - 1,
+            "Captcha should appear once, alongside the submit button on the last panel, not on every panel");
+    }
+
+    @Test
+    void testGenerateFormOmitsPrefillServiceByDefault() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertFalse(xml.contains("prefillService"));
+    }
+
+    @Test
+    void testGenerateFormWiresRealPrefillServicePropertyWhenOptedIn() throws IOException {
+        Path spec = writeSpec("employee-onboarding.json", ONBOARDING_FORM_SPEC_WITH_PREFILL);
+
+        specToCodeGenerator.generateForm(spec.toString(), tempDir.toString(), "AcmeApp");
+
+        String xml = Files.readString(generatedFormXml("AcmeApp", "employee-onboarding"));
+        assertTrue(xml.contains("prefillService=\"bmadPrefillDataService\""));
     }
 
     @Test

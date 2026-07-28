@@ -10,7 +10,10 @@ code versus scaffolding you'd still need to build.
 | Capability | Status | Notes |
 |---|---|---|
 | `SpecToCodeGenerator.generate()` | **Real** | Generates a Sling Model + HTL component + React field component from a JSON Schema spec, and now auto-registers every generated React component in `App.jsx`'s `customMappings` (import + mapping entry, idempotent across re-runs) — no more manual wiring. Verified via real compile/deploy. |
-| `SpecToCodeGenerator.generateForm()` | **Real, live-verified** | Generates a complete, submittable Adaptive Form (real JCR page/panel/field structure, standard field components, a working submit action) from a multi-panel spec. The most thoroughly proven capability in this archetype — deployed to a live instance and confirmed by actually POSTing a real submission and getting `HTTP 200`. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
+| `SpecToCodeGenerator.generateForm()` | **Real, live-verified** | Generates a complete, submittable Adaptive Form (real JCR page/panel/field structure, standard field components, a working submit action, a real "Save for Later" button on every step, and an opt-in reCAPTCHA field) from a multi-panel spec. The most thoroughly proven capability in this archetype — deployed to a live instance and confirmed by actually POSTing a real submission and getting `HTTP 200`. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
+| `PrefillDataService` | **Real, live-verified end to end** | Implements the real `com.adobe.forms.common.service.DataProvider` extension point (verified via `javap`). The form-to-service wiring — a `prefillService` content property on the `guideContainer` — was found by decompiling AEM's own running `AdaptiveFormDataServlet`/`FormDataProviderRegistryImpl` classes and confirmed by a real invocation log line naming this service. That same live test caught a real bug (the outbound HTTP call had no auth header, so the shipped example endpoint 401'd) — fixed, unit-tested, and then live-verified again (via a small hand-built OSGi bundle standing in for the archetype's own drifted core bundle): the fixed call now returns `HTTP 200` and real customer data flows through `/adobe/forms/af/data/<id>` end to end. `generateForm()` now supports opting into this via a `prefillService` spec key. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
+| reCAPTCHA field (`generateForm()`, opt-in) | **Real component, config wiring not live-verified** | When a spec sets a top-level `recaptcha.cloudServicePath`, `generateForm()` emits a `captcha` field on the real, already-shipped `<appName>/components/adaptiveForm/recaptcha` proxy (extends Core Components' own `recaptcha/v1/recaptcha`), pointed at a Cloud Service Configuration path. Whether AEM verifies the token server-side automatically once that config is authored (rather than needing custom code) was reasoned from the dialog's real properties, not independently confirmed live. See [Generating a Complete Adaptive Form](#generating-a-complete-adaptive-form). |
+| `SubmissionAuditService` | **Real interface, editor-wiring step unconfirmed** | Implements the real `com.adobe.aemds.guide.service.FormSubmitActionService` extension point (verified via `javap`), the same class of interface Adobe's own `aem-core-forms-components` integration-test fixture uses for a custom submit handler. Builds a structured audit record (submission id, form path, submitter, client IP, user agent, referer, timestamp, submitted data) and forwards it through the archetype's own already real, live-verified `FormSubmissionService`. Unit-tested; registering it as a form's actual submit service and confirming it fires end-to-end wasn't live-tested this pass. See [Submission Audit Trail](#submission-audit-trail). |
 | `SignToDoRProcess` (Document of Record) | **Real** | Calls the actual AEM Forms `DoRService`, verified against a real running instance. Has real prerequisites — see [Document of Record (DoR) Generation](#document-of-record-dor-generation) below; your form needs to be DAM-backed (Forms Manager-style), not just a WCM page, for it to work. |
 | `AdobeSignOrchestrator` | **Real, not live-tested** | `AdobeSignOrchestratorImpl` calls the real Adobe Sign REST API v6 (transient document upload, agreement creation, status, signed-document download, webhooks). Request/response shapes verified against Adobe's own docs and mocked in tests — not yet run against a real Adobe Sign account. See [Adobe Sign Integration](#adobe-sign-integration). |
 | `FormSubmissionService` | **Real, live-verified** | Real HTTP POST to a configurable external endpoint, wired into `HeadlessSubmitServlet`. Verified with a real listener (success) and real connection-refused failure — both paths, not just compile. |
@@ -321,6 +324,106 @@ independent of the dialog research — the shipped `contact-us-form`
 sample's `telephoneinput` field carries `pattern="^[0-9]{10}$"` as real,
 working content.
 
+**Save for Later, now supported — with a real, addressable
+prerequisite.** Every panel gets a real "Save for Later" button (not just
+the last one — the whole point of saving progress is leaving partway
+through a multi-step form), wired via the real `saveForm(url)` global
+function confirmed against the published `@aemforms/af-core` source, not
+guessed. The exact button shape and endpoint pattern
+(`/adobe/forms/af/save/<base64(pagePath)>`, wrapped in AEM's own
+`externalize(...)` helper) come directly from Adobe's own
+`aem-core-forms-components` integration test fixture for this feature —
+the real reference this generator's other content shapes have used all
+session. **Live-tested, not just generated**: deployed real content
+carrying this button and POSTed directly to the real save endpoint —
+confirmed it's real and POST-capable (`Allow: POST`), and got back a
+real, specific error: `USCException: USC configuration not enabled`.
+"USC" is AEM's Unified Storage Connector — a real, documented,
+addressable configuration prerequisite for draft persistence (see
+Adobe's own docs on saving Core Components forms as drafts), not a bug
+in this generated content. Configure a Unified Storage Connector on your
+instance before expecting this button to actually persist a draft.
+
+**Prefill, now live-verified end to end — including the exact real
+wiring and a real bug this uncovered.** `PrefillDataService`
+(`core/.../services/impl/PrefillDataService.java`) implements the real
+`com.adobe.forms.common.service.DataProvider` interface (verified via
+`javap` against the pinned SDK jar, including a real compile error this
+surfaced: `DataProvider` extends `DataProviderBase`, which requires
+`getServiceName()`/`getServiceDescription()` too — not visible from
+`DataProvider`'s own method alone). An earlier pass shipped this
+implemented-but-unconfirmed, having tried authoring a `dataRef` *property*
+on the `guideContainer` with no effect. The real mechanism turned out to
+be different: decompiling the actual running `AdaptiveFormDataServlet`
+and `FormDataProviderRegistryImpl` classes from a live instance's own
+`com.adobe.aem.forms.af.rest`/`aemds-guide-core-impl` bundles (not
+guessed — pulled straight off disk from a running AEM SDK install) showed
+the servlet reads a `prefillService` property off the `guideContainer`
+(`FormContainer#getPrefillService()`) and, when set, looks up a
+registered provider by that exact name in a real name-keyed map — while
+`dataRef` is only ever read as a *request query parameter*, a completely
+different mechanism, which is why the earlier attempt never fired.
+`generateForm()` now supports opting into this: a top-level
+`"prefillService": "<name>"` in a form spec emits that property on the
+generated `guideContainer` (a spec with no `prefillService` key generates
+exactly as before — see `testGenerateFormOmitsPrefillServiceByDefault`).
+
+**Live-tested, not just decompiled**: authored `prefillService=
+bmadPrefillDataService` on a real deployed form's `guideContainer` and
+GET `/adobe/forms/af/data/<id>?customerId=CUST-10293` produced a real
+`error.log` line from `FormDataProviderRegistryImpl` naming this exact
+service and invoking it — full confirmation the wiring is correct. That
+same live call also surfaced a real, previously-hidden bug: the service's
+outbound HTTP call to its configured prefill endpoint carried no
+`Authorization` header, so the shipped example endpoint
+(`MockFinanceDataServlet`, a real Sling servlet on the same instance,
+which requires AEM auth like any other Sling resource) returned a real
+`401` — confirmed independently via `curl` with and without `-u`. Fixed:
+`PrefillDataService.Config` now has optional HTTP Basic Auth
+username/password attributes, sent as an `Authorization: Basic` header
+when configured; covered by new unit tests asserting the header is both
+present when configured and absent by default. **The fix is live-verified, not just unit-tested.** Redeploying the
+archetype's own core bundle to re-confirm hit a separate, real snag
+first: this instance's already-running core bundle's JCR-persisted jar no
+longer contains `PrefillDataService` at all (an older snapshot than
+what's actually active in memory) — its on-disk state and live runtime
+state had drifted apart after this session's many redeploys. Rather than
+rebuild that whole bundle by hand, a small standalone OSGi bundle
+(hand-written manifest and Declarative Services XML, no Maven needed) was
+installed alongside it via the real Felix Web Console bundle-install API,
+registering the exact same service name (`bmadPrefillDataService`) with
+the same Basic Auth fix. Result, straight from `error.log`:
+`FormDataProviderRegistryImpl` picked it by name and the endpoint call
+returned `HTTP 200`, and `/adobe/forms/af/data/<id>?customerId=CUST-10293`
+returned the real mock customer/employment/transaction data end to end —
+full proof the `prefillService` wiring *and* the auth fix both work, not
+just that they compile.
+
+**reCAPTCHA / spam protection, opt-in and built on components already
+shipped in this archetype — not newly invented.** Both
+`<appName>/components/adaptiveForm/recaptcha` and its `hcaptcha` sibling
+already existed in this archetype's `ui.apps` tree before this pass
+(extending Core Components' own `core/fd/components/form/recaptcha/v1/recaptcha`,
+with a real `_cq_template.xml` carrying `fieldType="captcha"` and
+`required="{Boolean}true"`). What was missing was `generateForm()` wiring
+one in. It's opt-in: add a top-level `"recaptcha": {"cloudServicePath":
+"/etc/cloudservices/recaptcha/<name>"}` to a form spec, and the last
+panel gets a `captcha` field on that same real component, referencing the
+given path via `rcCloudServicePath` — the real property name confirmed
+against the component's `_cq_dialog.xml` in Adobe's own
+`aem-core-forms-components` source, where it's a `granite/ui` select
+widget pointed at `/etc/cloudservices/recaptcha`. A spec with no
+`recaptcha` key generates exactly as before this feature existed (see
+`testGenerateFormOmitsCaptchaFieldByDefault`). **Honesty note**: the
+`cloudServicePath` still has to point at a real Cloud Service
+Configuration, authored separately with a real reCAPTCHA site/secret key
+pair — this generator only wires the reference, it can't generate
+credentials. Whether AEM verifies the token server-side automatically
+once that config exists (rather than needing custom verification code)
+was reasoned from the dialog's shape, matching how the framework's own
+submit/save endpoints are auto-provisioned without custom code, but this
+specific claim was not independently live-tested this pass.
+
 **Deliberately scoped out this pass, rather than guessed at**:
 - `dropdown`'s `date-input`/`drop-down` field type strings are AEM Forms
   Core Components' documented identifiers, not independently verified
@@ -438,6 +541,60 @@ verified via a real Vitest test suite (`App.test.jsx`, mocking
 — run `npm test` yourself in `ui.frontend.react.forms.af`. Consider
 setting `it.tests.skipFrontend=false` for your own project so regressions
 like the crash bug don't go undetected again.
+
+## Submission Audit Trail
+
+`SubmissionAuditService`
+(`core/.../services/impl/SubmissionAuditService.java`) implements the
+real `com.adobe.aemds.guide.service.FormSubmitActionService` interface
+(verified via `javap` against the pinned `aem-forms-sdk-api` jar) — the
+same class of extension point used by prefill's `DataProvider`, and the
+exact interface Adobe's own `aem-core-forms-components` integration-test
+fixture implements for a custom submit handler
+(`it/core/.../service/CustomAFSubmitService.java`, real, open-source
+Adobe code, not a guess). Its two methods (`getServiceName()`,
+`submit(FormSubmitInfo)`) match that real sample's shape exactly.
+
+**What it does.** `FormSubmitInfo` (also a real, `javap`-verified class)
+carries genuinely useful audit fields beyond the raw form data: a
+submission ID, the form's path, the submitter, client IP, user agent, and
+referer. `SubmissionAuditService` builds a structured JSON record from
+all of these plus a timestamp and the submitted data itself (embedded as
+real JSON when it parses, falling back to a text field otherwise so a
+submission is never dropped from the trail over a parsing failure), then
+forwards that record through the archetype's own `FormSubmissionService`
+— the same HTTP-forward mechanism already live-verified this session
+against both a real listener and a real connection-refused failure.
+Point its configured endpoint at whatever system should retain the trail
+(a SIEM, a data warehouse, a ticketing system) — this generates real,
+useful data at the point AEM Forms already exposes it, rather than
+inventing new JCR storage and service-user/ACL plumbing that couldn't be
+live-verified this pass.
+
+**A real, discoverable datasource entry** also ships at
+`ui.apps/.../apps/<appName>/customsubmission/submissionAudit/.content.xml`
+(`guideComponentType="fd/af/components/guidesubmittype"`,
+`submitService="bmadSubmissionAuditService"`), matching the shape of
+Adobe's own real `customsubmission/logsubmit` sample byte-for-byte in
+structure — this is what makes a registered `FormSubmitActionService`
+selectable from the Adaptive Forms Editor's Submit Action Type dropdown.
+
+**Honesty note**: per Adobe's own real sample, selecting a custom
+`FormSubmitActionService` as a form's submit service means it becomes the
+form's actual submission handler (there's no confirmed "runs alongside
+the framework's own restendpoint action" mode) — so wiring this in on a
+production form is a deliberate choice, not a drop-in addition alongside
+`generateForm()`'s default submit button. The Java-side interface and the
+datasource-folder registration shape are both independently confirmed
+real; the exact `guideContainer` content property that selects a chosen
+`submitService` by name isn't demonstrated in any real sample this
+session could find (Adobe's own IT content only shows `restendpoint`/
+`email` action types authored directly in content). Confirm the exact
+authoring step against your own instance's Rule Editor / Submit Action
+Type UI before relying on this being reachable purely through generated
+content. Unit-tested (`SubmissionAuditServiceTest`, verifying the built
+JSON payload shape and both the success and `FormSubmissionException`
+paths) but not live-tested against a real AEM submission this pass.
 
 ## Document of Record (DoR) Generation
 

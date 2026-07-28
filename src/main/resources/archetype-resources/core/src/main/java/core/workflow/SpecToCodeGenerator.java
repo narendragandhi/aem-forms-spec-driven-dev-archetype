@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -163,7 +164,25 @@ public class SpecToCodeGenerator {
         String slug = toKebabCase(toComponentName(title));
         Path out = Paths.get(outputPath);
 
-        Path pageFile = writeFormContent(out, appName, slug, title, panels);
+        // Real, opt-in only (a spec with no "recaptcha" key generates
+        // identically to before this feature existed) - see
+        // appendCaptchaField for the real property/config shape this maps to.
+        String recaptchaCloudServicePath = root.hasNonNull("recaptcha")
+            && root.get("recaptcha").hasNonNull("cloudServicePath")
+                ? root.get("recaptcha").get("cloudServicePath").asText()
+                : null;
+
+        // Real, opt-in only, and live-confirmed this session: authoring
+        // this exact property name on the guideContainer is what makes
+        // AdaptiveFormDataServlet route /adobe/forms/af/data/<id> to a
+        // registered DataProvider/FormSubmitActionService-style service by
+        // its getServiceName() - decompiled from the real running
+        // AdaptiveFormDataServlet/FormDataProviderRegistryImpl classes,
+        // not guessed. See PrefillDataService's javadoc for the full
+        // finding.
+        String prefillService = root.hasNonNull("prefillService") ? root.get("prefillService").asText() : null;
+
+        Path pageFile = writeFormContent(out, appName, slug, title, panels, recaptchaCloudServicePath, prefillService);
         LOG.info("Generated Adaptive Form: {}", pageFile);
         LOG.info("Spec-to-Code Form Generation completed for: {}", specPath);
     }
@@ -820,7 +839,8 @@ public class SpecToCodeGenerator {
     // carries no AEM-Forms-specific policies; the sample's own
     // "standard-application" template reference is a pre-existing dangling
     // reference in this archetype's shipped content, not something to copy).
-    private Path writeFormContent(Path out, String appName, String slug, String title, List<SpecPanel> panels) throws IOException {
+    private Path writeFormContent(Path out, String appName, String slug, String title, List<SpecPanel> panels,
+            String recaptchaCloudServicePath, String prefillService) throws IOException {
         Path pageDir = out.resolve("ui.content/src/main/content/jcr_root/content/forms/af/" + appName + "/" + slug);
         Files.createDirectories(pageDir);
 
@@ -840,6 +860,9 @@ public class SpecToCodeGenerator {
         xml.append("            editable=\"{Boolean}true\"\n");
         xml.append("            guideNodeClass=\"guideContainerNode\"\n");
         xml.append("            actionType=\"fd/af/components/guidesubmittype/restendpoint\"\n");
+        if (prefillService != null && !prefillService.isEmpty()) {
+            xml.append("            prefillService=\"").append(xmlEscape(prefillService)).append("\"\n");
+        }
         xml.append("            thankYouOption=\"page\"\n");
         xml.append("            thankYouMessage=\"Thank you for your submission.\">\n");
         xml.append("            <rootPanel\n");
@@ -863,7 +886,11 @@ public class SpecToCodeGenerator {
             for (SpecField f : panel.fields) {
                 appendFormField(xml, f, appName, "                            ");
             }
+            appendSaveButton(xml, appName, slug, "                            ");
             if (lastPanel) {
+                if (recaptchaCloudServicePath != null && !recaptchaCloudServicePath.isEmpty()) {
+                    appendCaptchaField(xml, appName, recaptchaCloudServicePath, "                            ");
+                }
                 appendSubmitButton(xml, appName, "                            ");
             }
             xml.append("                        </items>\n");
@@ -902,6 +929,70 @@ public class SpecToCodeGenerator {
         xml.append(indent).append("        jcr:primaryType=\"nt:unstructured\"\n");
         xml.append(indent).append("        click=\"[submitForm()]\"/>\n");
         xml.append(indent).append("</submitButton>\n");
+    }
+
+    // Real save-as-draft mechanism, confirmed against Adobe's own
+    // aem-core-forms-components integration test sample
+    // (it/content/.../samples/ruleeditor/save/saveruntime/.content.xml):
+    // a plain button (fieldType="button", resourceType .../adaptiveForm/button
+    // - a generic button, NOT actions/submit) whose fd:events click calls
+    // the real saveForm(url) global function against
+    // /adobe/forms/af/save/<base64(pagePath)> - the same base64(JCR page
+    // path) scheme already confirmed for the framework's own auto-provisioned
+    // submit action and prefill data URL. externalize(...) is AEM's own
+    // real client-side helper for resolving a relative path to an absolute
+    // URL (matches the real sample verbatim, not guessed).
+    //
+    // Live-tested: this endpoint is real and POST-capable (confirmed via a
+    // real instance's Allow header), but returned a real
+    // USCException("USC configuration not enabled") on the instance this
+    // was tested against - a real, addressable Unified Storage Connector
+    // prerequisite (see README), not a bug in this generated content. Put
+    // on every panel (not just the last) since the point of save-for-later
+    // is leaving partway through a multi-step form.
+    private void appendSaveButton(StringBuilder xml, String appName, String slug, String indent) {
+        String pagePath = "/content/forms/af/" + appName + "/" + slug;
+        String saveUrl = "/adobe/forms/af/save/"
+            + Base64.getEncoder().encodeToString(pagePath.getBytes(StandardCharsets.UTF_8));
+        xml.append(indent).append("<saveButton\n");
+        xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/button\"\n");
+        xml.append(indent).append("    name=\"saveButton\"\n");
+        xml.append(indent).append("    jcr:title=\"Save for Later\"\n");
+        xml.append(indent).append("    fieldType=\"button\"\n");
+        xml.append(indent).append("    dorExclusion=\"true\">\n");
+        xml.append(indent).append("    <fd:events\n");
+        xml.append(indent).append("        jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append(indent).append("        click=\"[saveForm(externalize('").append(saveUrl).append("'))]\"/>\n");
+        xml.append(indent).append("</saveButton>\n");
+    }
+
+    // Opt-in only (see generateForm's recaptchaCloudServicePath read) - the
+    // <appName>/components/adaptiveForm/recaptcha proxy already ships in
+    // this archetype's ui.apps tree (extends
+    // core/fd/components/form/recaptcha/v1/recaptcha), confirmed real via
+    // its own _cq_template.xml (fieldType="captcha", required="{Boolean}true")
+    // and its _cq_dialog.xml in the real Adobe core-forms-components repo,
+    // which exposes rcCloudServicePath as a granite/ui select widget
+    // pointed at /etc/cloudservices/recaptcha - the standard AEM Cloud
+    // Service Configuration mechanism for storing a third-party site/secret
+    // key pair outside of code. This generator only wires the field to
+    // reference a cloud service config path (authored separately, with a
+    // real reCAPTCHA site/secret key, by whoever deploys the generated
+    // project) - it does not, and could not, generate the credentials
+    // themselves. Server-side verification of the token is expected to be
+    // handled natively by the AEM Forms framework once that config exists,
+    // matching how the framework's own submit/save endpoints are already
+    // auto-provisioned without custom code - this specific claim was
+    // reasoned from the dialog's shape, not independently live-verified.
+    private void appendCaptchaField(StringBuilder xml, String appName, String cloudServicePath, String indent) {
+        xml.append(indent).append("<captcha\n");
+        xml.append(indent).append("    jcr:primaryType=\"nt:unstructured\"\n");
+        xml.append(indent).append("    sling:resourceType=\"").append(appName).append("/components/adaptiveForm/recaptcha\"\n");
+        xml.append(indent).append("    name=\"captcha\"\n");
+        xml.append(indent).append("    fieldType=\"captcha\"\n");
+        xml.append(indent).append("    rcCloudServicePath=\"").append(xmlEscape(cloudServicePath)).append("\"\n");
+        xml.append(indent).append("    required=\"{Boolean}true\"/>\n");
     }
 
     // Real shape confirmed against the shipped benefits-enrollment sample:
