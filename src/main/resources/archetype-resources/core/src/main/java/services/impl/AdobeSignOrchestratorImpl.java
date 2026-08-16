@@ -382,8 +382,9 @@ public class AdobeSignOrchestratorImpl implements AdobeSignOrchestrator {
     private void requireSuccess(HttpResponse<byte[]> response, String action) throws AdobeSignException {
         int status = response.statusCode();
         if (status < 200 || status >= 300) {
-            String body = new String(response.body(), StandardCharsets.UTF_8);
-            throw new AdobeSignException("Failed to " + action + " - Adobe Sign returned HTTP " + status + ": " + body);
+            // Do not include the provider response body: it can contain PII,
+            // signer metadata, or provider diagnostics that must stay private.
+            throw new AdobeSignException("Failed to " + action + " - Adobe Sign returned HTTP " + status);
         }
     }
 

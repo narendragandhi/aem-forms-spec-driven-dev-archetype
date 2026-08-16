@@ -1,0 +1,30 @@
+name: continuous-improvement
+description: Bounded, evidence-driven improvement loop for AEM Forms projects
+version: 1
+steps:
+  - id: capture-signal
+    output: improvement-bead
+  - id: reproduce
+    requires: [improvement-bead]
+    output: synthetic-regression-fixture
+  - id: propose
+    requires: [synthetic-regression-fixture]
+    output: reviewed-change-proposal
+  - id: verify
+    requires: [reviewed-change-proposal]
+    checks: [unit, integration, browser, accessibility, security, policy]
+  - id: approve
+    requires: [verify]
+    human: true
+  - id: canary
+    requires: [approve]
+    output: canary-evidence
+  - id: baseline
+    requires: [canary]
+    output: evidence-register-update
+stop_conditions:
+  - evaluator_changed
+  - personal_data_required
+  - privilege_increase
+  - repeated_failure
+  - missing_evidence

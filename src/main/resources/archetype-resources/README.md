@@ -44,6 +44,25 @@ To build and deploy the complete package to a local AEM instance, run:
 
     mvn clean install -PautoInstallSinglePackage
 
+## Foundation generation options
+
+The archetype keeps the showcase operating model consistent while allowing each
+project to choose its scope:
+
+| Property | Default | Purpose |
+|---|---:|---|
+| `enableEvaluation` | `true` | deterministic policy evaluation contract |
+| `enableHITL` | `true` | explicit human review contract |
+| `enableObservability` | `true` | correlation IDs, health, and metrics |
+| `enableResilience` | `false` | opt-in circuit-breaker implementation seam |
+| `enableMigration` | `false` | PDF/legacy-form to Adaptive Forms migration contract |
+
+Override these properties when generating a project. The generated
+`bmad/foundation-config.yaml` is the source of truth for the selected foundation
+features. A feature being enabled documents the contract and scaffolding; live
+Adobe Sign, Publish, Inbox, and production telemetry still require environment
+configuration and evidence.
+
 ## Adapting the BMAD Methodology for AEM Forms
 
 The included `bmad/` directory contains the full methodology. When applying it to a Forms project, the focus of each phase shifts:
@@ -54,3 +73,7 @@ The included `bmad/` directory contains the full methodology. When applying it t
 - **Phase 04: Development Sprint**: Development will center on creating custom React form components in the `ui.frontend.react.forms.af` module and building workflows to orchestrate form submissions.
 
 Please refer to the documents in the `bmad/` directory for a deeper understanding of the methodology.
+
+For a repeatable new-project lifecycle, see [`docs/PROJECT-PLAYBOOK.md`](docs/PROJECT-PLAYBOOK.md),
+[`docs/PRESENTATION-RUNBOOK.md`](docs/PRESENTATION-RUNBOOK.md), and
+[`docs/NEW-PROJECT-CHECKLIST.md`](docs/NEW-PROJECT-CHECKLIST.md).

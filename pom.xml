@@ -14,6 +14,17 @@
     </description>
 
     <build>
+        <!-- Keep the archetype as a source template. Generated projects restore
+             frontend dependencies with their normal npm install step. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>**/node_modules/**</exclude>
+                    <exclude>**/.playwright-cli/**</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <extensions>
             <extension>
                 <groupId>org.apache.maven.archetype</groupId>

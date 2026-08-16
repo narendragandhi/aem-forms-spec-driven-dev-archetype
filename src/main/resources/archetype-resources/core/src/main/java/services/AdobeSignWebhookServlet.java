@@ -74,7 +74,8 @@ public class AdobeSignWebhookServlet extends SlingAllMethodsServlet {
             if (agreement != null && agreement.get("id") != null && agreement.get("status") != null) {
                 adobeSignOrchestrator.recordWebhookStatus(agreement.get("id").asText(), agreement.get("status").asText());
             } else {
-                LOG.debug("Adobe Sign webhook payload had no agreement id/status, ignoring: {}", body);
+                // Never log webhook payloads: they may contain signer and document data.
+                LOG.debug("Adobe Sign webhook payload had no agreement id/status, ignoring");
             }
         } catch (IOException e) {
             LOG.warn("Could not parse Adobe Sign webhook payload", e);

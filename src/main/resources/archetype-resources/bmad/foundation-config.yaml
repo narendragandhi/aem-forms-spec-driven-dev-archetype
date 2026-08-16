@@ -1,0 +1,12 @@
+foundationVersion: ${foundationVersion}
+features:
+  evaluation: ${enableEvaluation}
+  hitl: ${enableHITL}
+  observability: ${enableObservability}
+  resilience: ${enableResilience}
+  formsMigration: ${enableMigration}
+contracts:
+  correlationHeader: X-Correlation-ID
+  beadDirectory: bmad/gastown/bead/.issues
+  healthEndpoint: /bin/bmad/observability/health
+  metricsEndpoint: /bin/bmad/observability/metrics

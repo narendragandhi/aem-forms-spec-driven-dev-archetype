@@ -10,6 +10,29 @@
         <requiredProperty key="appName">
             <defaultValue>MyFormsApp</defaultValue>
         </requiredProperty>
+        <requiredProperty key="foundationVersion">
+            <defaultValue>1.0.0</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="enableEvaluation">
+            <defaultValue>true</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="enableHITL">
+            <defaultValue>true</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="enableObservability">
+            <defaultValue>true</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="enableResilience">
+            <defaultValue>false</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
+        <requiredProperty key="enableMigration">
+            <defaultValue>false</defaultValue>
+            <validationRegex>true|false</validationRegex>
+        </requiredProperty>
     </requiredProperties>
     <fileSets>
         <!-- Filtered text files (POMs, XMLs, Java, JS) -->
@@ -160,6 +183,9 @@
                 <include>**/*.toml</include>
                 <include>**/.gitkeep</include>
             </includes>
+            <excludes>
+                <exclude>foundation-config.yaml</exclude>
+            </excludes>
         </fileSet>
         <fileSet filtered="false" encoding="UTF-8">
             <directory>bmad/gastown/scripts</directory>
@@ -167,11 +193,27 @@
                 <include>**/*.sh</include>
             </includes>
         </fileSet>
+        <fileSet filtered="false">
+            <directory>docs</directory>
+            <includes>
+                <include>**/*.md</include>
+                <include>**/*.csv</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true">
+            <directory>bmad</directory>
+            <includes>
+                <include>foundation-config.yaml</include>
+            </includes>
+        </fileSet>
         <!-- NOT filtered: Velocity treats markdown '##' headings as line comments -->
         <fileSet filtered="false">
             <directory></directory>
             <includes>
                 <include>AGENTS.md</include>
+                <include>CONTRIBUTING.md</include>
+                <include>SECURITY.md</include>
+                <include>CODE_OF_CONDUCT.md</include>
             </includes>
         </fileSet>
         <fileSet filtered="false">

@@ -15,6 +15,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.propertytypes.ServiceDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ${package}.observability.ObservabilityService;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -32,11 +33,16 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
     @Reference
     private transient FormSubmissionService formSubmissionService;
 
+    @Reference
+    private transient ObservabilityService observability;
+
     @Override
     protected void doGet(final SlingHttpServletRequest req,
             final SlingHttpServletResponse resp) throws ServletException, IOException {
 
         String workflowId = req.getParameter("workflowId");
+        String correlationId = (String) req.getAttribute("bmad.correlationId");
+        observability.recordStatusPoll(correlationId);
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
 
@@ -83,6 +89,7 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
 
         } catch (Exception e) {
             LOG.error("Error fetching workflow status for workflowId: {}", workflowId, e);
+            observability.recordFailure(correlationId, "status", e);
             resp.sendError(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error fetching workflow status");
         }
     }
@@ -105,6 +112,7 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
 
         String submittedData = sb.toString();
         String workflowId = "WF-" + System.currentTimeMillis();
+        String correlationId = (String) req.getAttribute("bmad.correlationId");
 
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
@@ -112,12 +120,14 @@ public class HeadlessSubmitServlet extends SlingAllMethodsServlet {
         ObjectNode result = MAPPER.createObjectNode();
         try {
             formSubmissionService.processSubmission(submittedData, workflowId);
+            observability.recordSubmission(correlationId);
             resp.setStatus(SlingHttpServletResponse.SC_OK);
             result.put("status", "success");
             result.put("message", "Form submitted and Sign workflow initiated");
             result.put("workflowId", workflowId);
         } catch (FormSubmissionException e) {
-            LOG.error("Failed to dispatch form submission for workflowId: {}", workflowId, e);
+            observability.recordFailure(correlationId, "submission", e);
+            LOG.error("Failed to dispatch form submission for workflowId={} correlationId={}", workflowId, correlationId, e);
             resp.setStatus(SlingHttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             result.put("status", "error");
             result.put("message", e.getMessage());

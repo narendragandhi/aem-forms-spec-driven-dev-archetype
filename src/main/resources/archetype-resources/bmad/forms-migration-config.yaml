@@ -1,0 +1,26 @@
+profile: forms-migration
+source:
+  type: pdf | scanned-pdf | xfa | legacy-form
+  inventory_reference: replace-me
+  source_version: replace-me
+target:
+  adaptive_form_path: replace-me
+  form_data_model: replace-me
+mapping:
+  register_reference: replace-me
+  unmapped_policy: block-until-approved
+validation:
+  business_parity: required
+  data_reconciliation: required
+  accessibility: required
+  browser_journey: required
+  security: required
+coexistence:
+  enabled: true
+  start_date: replace-me
+  end_date: replace-me
+  rollback_target: replace-me
+cutover:
+  approval_required: true
+  archive_source: true
+  retain_audit_link: true
