@@ -37,10 +37,15 @@ jobs:
       # integration test, which generates src/test/resources/projects/
       # reference-project and builds the generated reactor. That generated
       # build is the whole test suite -- there is nothing else to run.
-      # Heap comes from .mvn/jvm.config (-Xmx4g); 38MB of archetype
-      # resources will OOM the default.
+      # .mvn/jvm.config asks for -Xmx4g, which is enough locally but not
+      # on a runner: maven-archetype-plugin:jar holds the archetype
+      # resources in memory while assembling, and this archetype ships
+      # ~15MB of theme.zip alone, so 4g OOMs here. MAVEN_OPTS is applied
+      # after jvm.config, so this wins without editing the shared file.
       - name: mvn clean install
         run: mvn -B -ntp clean install
+        env:
+          MAVEN_OPTS: -Xmx6g
 
       # The generated project's surefire reports live several levels deep
       # inside target/, so a failure is otherwise only readable in the log.
