@@ -21,7 +21,15 @@ This document records the parameters used to generate the AEM project using the 
 - **frontendModule**: react
 - **includeFormsenrollment**: y
 - **aemVersion**: cloud
-- **sdkVersion**: 2026.2.24678.20260226T154829Z-260200
+- **sdkVersion**: 2026.2.24678.20260226T154829Z-260200 *(as originally generated — see note below)*
+
+> **Note (2026-09-05):** `pom.xml`'s pinned versions have since been
+> manually updated past what's shown above — `aem.sdk.api` to
+> `2026.8.27673.20260811T193135Z-260700`, `core.wcm.components.version`
+> to `2.28.0`, and `aem.forms.sdk.api` to `2026.08.12.00-260700` (matching
+> the `-2607` suffix convention, confirmed against Maven Central). This
+> record is left as-is below since it documents the actual original
+> `archetype:generate` invocation — not something to rewrite retroactively.
 
 ## Command Used
 

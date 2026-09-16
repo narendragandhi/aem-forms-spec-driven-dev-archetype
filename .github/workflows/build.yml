@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  archetype-it:
+    name: Generate and build the reference project
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # frontend-maven-plugin downloads its own Node/npm per generated
+      # module, so there is no setup-node step -- but it does run
+      # `npm install --legacy-peer-deps` against a fresh directory every
+      # time, so the shared npm cache is what keeps that from dominating.
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('src/main/resources/archetype-resources/**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      # `mvn install` on a maven-archetype project runs the archetype
+      # integration test, which generates src/test/resources/projects/
+      # reference-project and builds the generated reactor. That generated
+      # build is the whole test suite -- there is nothing else to run.
+      # Heap comes from .mvn/jvm.config (-Xmx4g); 38MB of archetype
+      # resources will OOM the default.
+      - name: mvn clean install
+        run: mvn -B -ntp clean install
+
+      # The generated project's surefire reports live several levels deep
+      # inside target/, so a failure is otherwise only readable in the log.
+      - name: Collect generated-project test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/test-classes/projects/**/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 14
