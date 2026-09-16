@@ -322,9 +322,12 @@ When starting a new session as Tester:
 
 2. **Check dependencies**:
    - Review `depends_on` in your issue
-   - Verify implementation is complete:
+   - Verify implementation is complete (real `bd` command — see
+     `bmad/gastown/bead/BEADS-SETUP.md`; do not grep a status field out of
+     a markdown file, that convention doesn't correspond to how issues are
+     actually stored):
      ```bash
-     grep "status:" bmad/gastown/bead/.issues/coder/{dependency-id}.md
+     bd show {dependency-id} --json | jq -r '.[0].status'
      ```
 
 3. **Read handoff notes**:

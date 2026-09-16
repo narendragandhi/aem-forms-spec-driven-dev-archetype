@@ -1,5 +1,6 @@
 package ${package}.services;
 
+import ${package}.observability.ObservabilityService;
 import com.adobe.granite.workflow.WorkflowException;
 import com.adobe.granite.workflow.WorkflowSession;
 import com.adobe.granite.workflow.exec.Workflow;
@@ -29,9 +30,14 @@ class HeadlessSubmitServletTest {
     void setUp() throws Exception {
         servlet = new HeadlessSubmitServlet();
         formSubmissionService = mock(FormSubmissionService.class);
-        Field field = HeadlessSubmitServlet.class.getDeclaredField("formSubmissionService");
+        inject("formSubmissionService", formSubmissionService);
+        inject("observability", mock(ObservabilityService.class));
+    }
+
+    private void inject(String fieldName, Object value) throws Exception {
+        Field field = HeadlessSubmitServlet.class.getDeclaredField(fieldName);
         field.setAccessible(true);
-        field.set(servlet, formSubmissionService);
+        field.set(servlet, value);
     }
 
     // --- GET (status polling) ---

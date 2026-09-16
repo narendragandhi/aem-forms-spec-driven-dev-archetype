@@ -262,10 +262,13 @@ When starting a new session as Reviewer:
    ```
 
 2. **Check dependencies**:
-   - Verify both implementation AND testing are complete:
+   - Verify both implementation AND testing are complete (real `bd`
+     command — see `bmad/gastown/bead/BEADS-SETUP.md`; do not grep a
+     status field out of a markdown file, that convention doesn't
+     correspond to how issues are actually stored):
      ```bash
-     grep "status:" bmad/gastown/bead/.issues/coder/{impl-id}.md
-     grep "status:" bmad/gastown/bead/.issues/tester/{test-id}.md
+     bd show {impl-id} --json | jq -r '.[0].status'
+     bd show {test-id} --json | jq -r '.[0].status'
      ```
 
 3. **Gather files to review**:
