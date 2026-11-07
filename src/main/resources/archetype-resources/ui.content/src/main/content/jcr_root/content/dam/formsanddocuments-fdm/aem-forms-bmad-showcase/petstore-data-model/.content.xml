@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jcr:root xmlns:jcr="http://www.jcp.org/jcr/1.0" xmlns:dam="http://www.day.com/dam/1.0" xmlns:nt="http://www.jcp.org/jcr/nt/1.0" xmlns:cq="http://www.day.com/jcr/cq/1.0" xmlns:sling="http://sling.apache.org/jcr/sling/1.0"
+    jcr:primaryType="dam:Asset">
+    <jcr:content
+        cq:conf="/conf/aem-forms-bmad-showcase"
+        jcr:lastModified="{Date}2026-11-07T13:55:18.870-05:00"
+        jcr:primaryType="dam:AssetContent"
+        sling:resourceType="fd/fm/fdm/render"
+        type="formdatamodel">
+        <metadata
+            jcr:primaryType="nt:unstructured"
+            author="admin"
+            description="Swagger Petstore (public sample REST API) — pets, orders, users. Demo of a Swagger 2.0 data source with no auth."
+            title="Petstore Data Model"
+            uiModel="\{&quot;models&quot;:{&quot;Category&quot;:{&quot;x&quot;:40,&quot;y&quot;:80},&quot;Pet&quot;:{&quot;x&quot;:280,&quot;y&quot;:80},&quot;Tag&quot;:{&quot;x&quot;:520,&quot;y&quot;:80},&quot;Order&quot;:{&quot;x&quot;:760,&quot;y&quot;:80},&quot;User&quot;:{&quot;x&quot;:1000,&quot;y&quot;:80}}}"/>
+    </jcr:content>
+</jcr:root>

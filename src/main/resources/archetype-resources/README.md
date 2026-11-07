@@ -44,6 +44,46 @@ To build and deploy the complete package to a local AEM instance, run:
 
     mvn clean install -PautoInstallSinglePackage
 
+## Petstore Form Data Model demo
+
+A zero-credential Form Data Model backed by the public
+[Swagger Petstore](https://petstore.swagger.io) API, for showing REST data
+sources, prefill and submit without a Salesforce or Dynamics org.
+
+| Piece | Path |
+|---|---|
+| REST cloud config (Swagger 2.0 file, no auth) | `/conf/aem-forms-bmad-showcase/settings/cloudconfigs/fdm/petstore-cloud-config` |
+| Form Data Model | `/content/dam/formsanddocuments-fdm/aem-forms-bmad-showcase/petstore-data-model` |
+
+The Swagger file is a trimmed subset of the Petstore v2 spec (Apache 2.0):
+auth schemes, multipart uploads and login/logout are removed. The model has
+`Pet`, `Category`, `Tag`, `Order` and `User`, with default services:
+
+| Entity | Read service (request attribute) | Write service |
+|---|---|---|
+| Pet | `GET /pet/{petId}` (`petId`) | `POST /pet` |
+| Order | `GET /store/order/{orderId}` (`orderId`) | `POST /store/order` |
+| User | `GET /user/{username}` (`username`) | `POST /user` |
+
+Try it from the FDM editor (**Services → Test Service**), or from the command line:
+
+    curl -u admin:admin -H "CSRF-Token: $(curl -s -u admin:admin http://localhost:4502/libs/granite/csrf/token.json | jq -r .token)" \
+      http://localhost:4502/content/dam/formsanddocuments-fdm/aem-forms-bmad-showcase/petstore-data-model.executeDermisQuery.json \
+      --data-urlencode 'operationName=GET /pet/{petId}' \
+      --data-urlencode 'operationArguments={"petId":1}'
+
+Things to know before demoing:
+
+- The Petstore is a shared public sandbox. Data is ephemeral and anyone can
+  overwrite it. Create your own pet with `POST /pet` first, then read it back.
+- `GET /pet/findByStatus` returns 64-bit ids that lose precision in the browser.
+  Prefill by a pet id you created.
+- `POST /pet` reports "No response" in Test Service because the spec declares
+  no success body. The write still happens.
+- `GET /store/inventory` returns `{}`: its response is a free-form map, which
+  the FDM does not expose as properties.
+- AEM must be able to reach `petstore.swagger.io` over HTTPS.
+
 ## Foundation generation options
 
 The archetype keeps the showcase operating model consistent while allowing each
