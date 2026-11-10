@@ -2,6 +2,17 @@
 
 This directory contains example BEAD (Beads) issues that demonstrate how AI agents manage tasks within the BMAD framework.
 
+**Important: `.bead/config.yaml` in this directory is illustrative, not a
+real, usable `bd` configuration.** Its schema (`agents:`, `context_sources:`,
+`gastown: report_to:`) doesn't match the real `bd` CLI's actual config
+format — real `bd` config concerns Dolt storage/sync settings, not agent
+role definitions. For a real, verified-working `bd` config and command
+set, see `bmad/gastown/bead/BEADS-SETUP.md` — its commands were
+cross-checked against a real `bd` session and are accurate. The agent-role
+mapping shown here (mayor → coder/tester/reviewer/documenter) is a useful
+description of the *intended workflow*, just not something you can point
+`bd init` at directly.
+
 ## What is BEAD?
 
 BEAD is a Git-backed graph issue tracker designed for AI coding agents. It provides:
